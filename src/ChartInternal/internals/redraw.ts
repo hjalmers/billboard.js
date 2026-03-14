@@ -11,7 +11,7 @@ export default {
 	redraw(options: any = {}): void {
 		const $$ = this;
 		const {config, state, $el} = $$;
-		const {main} = $el;
+		const {main, treemap} = $el;
 
 		state.redrawing = true;
 
@@ -26,32 +26,29 @@ export default {
 		$$.updateSizes(initializing);
 
 		// update legend and transform each g
-
 		if (wth.Legend && config.legend_show) {
 			options.withTransition = !!duration;
-			$$.updateLegend($$.mapToIds($$.data.targets), options, transitions);
+			!treemap && $$.updateLegend($$.mapToIds($$.data.targets), options, transitions);
 		} else if (wth.Dimension) {
 			// need to update dimension (e.g. axis.y.tick.values) because y tick values should change
 			// no need to update axis in it because they will be updated in redraw()
 			$$.updateDimension(true);
 		}
 
-		// update circleY based on updated parameters
-		if (!$$.hasArcType() || state.hasRadar) {
-			$$.updateCircleY && ($$.circleY = $$.updateCircleY());
-		}
+		// Data empty label positioning and text.
+		config.data_empty_label_text && main.select(`text.${$TEXT.text}.${$COMMON.empty}`)
+			.attr("x", state.width / 2)
+			.attr("y", state.height / 2)
+			.text(config.data_empty_label_text)
+			.style("display", targetsToShow.length ? "none" : null);
+
+		// title - position early so other elements can calculate correct padding
+		$$.redrawTitle?.();
 
 		// update axis
 		if (state.hasAxis) {
 			// @TODO: Make 'init' state to be accessible everywhere not passing as argument.
 			$$.axis.redrawAxis(targetsToShow, wth, transitions, flow, initializing);
-
-			// Data empty label positioning and text.
-			config.data_empty_label_text && main.select(`text.${$TEXT.text}.${$COMMON.empty}`)
-				.attr("x", state.width / 2)
-				.attr("y", state.height / 2)
-				.text(config.data_empty_label_text)
-				.style("display", targetsToShow.length ? "none" : null);
 
 			// grid
 			$$.hasGrid() && $$.updateGrid();
@@ -66,7 +63,6 @@ export default {
 					$$[`update${name}`](wth.TransitionForExit);
 				}
 			});
-
 
 			// circles for select
 			$el.text && main.selectAll(`.${$SELECT.selectedCircles}`)
@@ -85,22 +81,31 @@ export default {
 
 			// radar
 			$el.radar && $$.redrawRadar();
+
+			// polar
+			$el.polar && $$.redrawPolar();
+
+			// funnel
+			$el.funnel && $$.redrawFunnel();
+
+			// treemap
+			treemap && $$.updateTreemap(durationForExit);
 		}
 
-		// @TODO: Axis & Radar type
-		if (!state.resizing && ($$.hasPointType() || state.hasRadar)) {
+		if (!state.resizing && !treemap && ($$.hasPointType() || state.hasRadar)) {
 			$$.updateCircle();
+		} else if ($$.hasLegendDefsPoint?.()) {
+			$$.data.targets.forEach($$.point("create", this));
 		}
 
 		// text
 		$$.hasDataLabel() && !$$.hasArcType(null, ["radar"]) && $$.updateText();
 
-		// title
-		$$.redrawTitle?.();
-
 		initializing && $$.updateTypesElements();
 
 		$$.generateRedrawList(targetsToShow, flow, duration, wth.Subchart);
+		$$.updateTooltipOnRedraw();
+
 		$$.callPluginHook("$redraw", options, duration);
 	},
 
@@ -169,8 +174,8 @@ export default {
 	},
 
 	getRedrawList(shape, flow, flowFn, withTransition: boolean): Function[] {
-		const $$ = <any> this;
-		const {config, state: {hasAxis, hasRadar}, $el: {grid}} = $$;
+		const $$ = <any>this;
+		const {config, state: {hasAxis, hasRadar, hasTreemap}, $el: {grid}} = $$;
 		const {cx, cy, xForText, yForText} = shape.pos;
 		const list: Function[] = [];
 
@@ -200,8 +205,12 @@ export default {
 				list.push($$.redrawText(xForText, yForText, flow, withTransition));
 		}
 
-		if (($$.hasPointType() || hasRadar) && !config.point_focus_only) {
+		if (($$.hasPointType() || hasRadar) && !$$.isPointFocusOnly()) {
 			$$.redrawCircle && list.push($$.redrawCircle(cx, cy, withTransition, flowFn));
+		}
+
+		if (hasTreemap) {
+			list.push($$.redrawTreemap(withTransition));
 		}
 
 		return list;
@@ -221,7 +230,8 @@ export default {
 		options.withUpdateXDomain = true;
 		options.withUpdateOrgXDomain = true;
 		options.withTransitionForExit = false;
-		options.withTransitionForTransform = getOption(options, "withTransitionForTransform", options.withTransition);
+		options.withTransitionForTransform = getOption(options, "withTransitionForTransform",
+			options.withTransition);
 
 		// MEMO: called in updateLegend in redraw if withLegend
 		if (!(options.withLegend && config.legend_show)) {
@@ -241,16 +251,5 @@ export default {
 
 		// Draw with new sizes & scales
 		$$.redraw(options, transitions);
-	},
-
-	redrawWithoutRescale() {
-		this.redraw({
-			withY: false,
-			withDimension: false,
-			withLegend: false,
-			withSubchart: false,
-			withEventRect: false,
-			withTransitionForAxis: false,
-		});
 	}
 };

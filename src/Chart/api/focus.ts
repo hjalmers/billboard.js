@@ -78,7 +78,7 @@ export default {
 
 		candidates.classed($FOCUS.focused, false).classed($FOCUS.defocused, true);
 
-		if ($$.hasArcType()) {
+		if ($$.hasArcType(null, ["polar"])) {
 			$$.unexpandArc(targetIds);
 
 			$$.hasType("gauge") &&
@@ -92,17 +92,17 @@ export default {
 	},
 
 	/**
-	 * This API reverts specified targets.<br><br>
-	 * You can specify multiple targets by giving an array that includes id as String. If no argument is given, all of targets will be reverted.
+	 * Revert focused or defocused state to initial state.<br><br>
+	 * You can specify multiple targets by giving an array that includes id as string. If no argument is given, all of targets will be reverted.
 	 * @function revert
 	 * @instance
 	 * @memberof Chart
 	 * @param {string|Array} targetIdsValue Target ids to be reverted
 	 * @example
-	 * // data1 will be reverted.
+	 * // 'data1' will be reverted.
 	 * chart.revert("data1");
 	 *
-	 * // data1 and data2 will be reverted.
+	 * // 'data1' and 'data2' will be reverted.
 	 * chart.revert(["data1", "data2"]);
 	 *
 	 * // all targets will be reverted.
@@ -115,7 +115,8 @@ export default {
 		const candidates = $el.svg.selectAll($$.selectorTargets(targetIds)); // should be for all targets
 
 		candidates.classed($FOCUS.focused, false).classed($FOCUS.defocused, false);
-		$$.hasArcType() && $$.unexpandArc(targetIds);
+
+		$$.hasArcType(null, ["polar"]) && $$.unexpandArc(targetIds);
 
 		if (config.legend_show) {
 			$$.showLegend(targetIds.filter($$.isLegendToShow.bind($$)));

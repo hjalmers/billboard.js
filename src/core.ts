@@ -5,10 +5,7 @@
 import Chart from "./Chart/Chart";
 import {isObject, mergeObj} from "./module/util";
 
-// eslint-disable-next-line no-use-before-define
-export {bb, bb as default};
-
-let defaults = {};
+let defaults = Object.create(null);
 
 /**
  * @namespace bb
@@ -26,7 +23,7 @@ const bb = {
 
 	/**
 	 * Generate chart
-	 * - **NOTE:** Bear in mind for the possiblity of ***throwing an error***, during the generation when:
+	 * - **NOTE:** Bear in mind for the possibility of ***throwing an error***, during the generation when:
 	 *   - Unused option value is given.
 	 *     - ex) For `data.type="pie"` option, setting 'axis' option can cause unexpected generation error.
 	 *   - Insufficient value is given for certain option used.
@@ -70,6 +67,7 @@ const bb = {
 	 *   gauge,
 	 *   line,
 	 *   pie,
+	 *   polar,
 	 *   radar,
 	 *   scatter,
 	 *   spline,
@@ -94,7 +92,7 @@ const bb = {
 	 * });
 	 */
 	generate(config) {
-		const options = mergeObj({}, defaults, config);
+		const options = mergeObj(Object.create(null), defaults, config);
 		const inst = new Chart(options);
 
 		inst.internal.charts = this.instance;
@@ -156,3 +154,5 @@ const bb = {
 	 */
 	plugin: {}
 };
+
+export {bb, bb as default};

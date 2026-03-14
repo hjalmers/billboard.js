@@ -51,3 +51,24 @@ Aziz Gazanchiyan <ZIZ@KMDPoland.pl>
 Eben Collins <collinseben@gmail.com>
 Shim Heungwoon <ajaxlab7@gmail.com>
 Marcos Gomez Castillo <marcos.gomez.castillo@tecsisa.com>
+Hjalmers <opensource@rhj.se>
+Won-Joon Lee <sniperj@sniperj.dev>
+Justin-Moon <https://github.com/Justin-Moon>
+Haung Lee <https://github.com/HanungLee>
+Chunmyong Park <chunmyong.park@kaist.ac.kr>
+neilnaveen <https://github.com/neilnaveen>
+Frank Tackitt <franklyn@tackitt.net>
+jongwooo <jongwooo.han@gmail.com>
+Jørn Andre Sundt <jorn.andre.sundt@jasmin.no>
+Erik Hopp <me@erikhopp.com>
+Do Yoon Kim <doyoonkim1002@gmail.com>
+RobinDeeCee <robindecock@gmail.com>
+nekoya <ryo.studiom@gmail.com>
+Ubin Park <https://github.com/Ubinquitous>
+William Nolden <william.nolden@able-group.de>
+Sergiu Statache <sergiu.statache@trisoft.ro>
+vlaforet <vlaforet@users.noreply.github.com>
+Alan Hamlett <alan.hamlett@gmail.com>
+Allen, Brad <BAllen+cvent@cvent.com>
+Seong Min Park <https://github.com/notoriousmango>
+Robin Van den Broeck <robin.broeck@gmail.com>

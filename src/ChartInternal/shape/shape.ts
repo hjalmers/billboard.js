@@ -2,31 +2,153 @@
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
+import {select as d3Select} from "d3-selection";
 import {
-	curveStepBefore as d3CurveStepBefore,
-	curveStepAfter as d3CurveStepAfter,
+	curveBasis as d3CurveBasis,
 	curveBasisClosed as d3CurveBasisClosed,
 	curveBasisOpen as d3CurveBasisOpen,
-	curveBasis as d3CurveBasis,
 	curveBundle as d3CurveBundle,
+	curveCardinal as d3CurveCardinal,
 	curveCardinalClosed as d3CurveCardinalClosed,
 	curveCardinalOpen as d3CurveCardinalOpen,
-	curveCardinal as d3CurveCardinal,
+	curveCatmullRom as d3CurveCatmullRom,
 	curveCatmullRomClosed as d3CurveCatmullRomClosed,
 	curveCatmullRomOpen as d3CurveCatmullRomOpen,
-	curveCatmullRom as d3CurveCatmullRom,
-	curveLinearClosed as d3CurveLinearClosed,
 	curveLinear as d3CurveLinear,
+	curveLinearClosed as d3CurveLinearClosed,
 	curveMonotoneX as d3CurveMonotoneX,
 	curveMonotoneY as d3CurveMonotoneY,
 	curveNatural as d3CurveNatural,
-	curveStep as d3CurveStep
+	curveStep as d3CurveStep,
+	curveStepAfter as d3CurveStepAfter,
+	curveStepBefore as d3CurveStepBefore
 } from "d3-shape";
-import {select as d3Select} from "d3-selection";
-import {d3Selection} from "../../../types/types";
+import type {d3Selection} from "../../../types/types";
 import CLASS from "../../config/classes";
-import {capitalize, getPointer, getRectSegList, getUnique, isObjectType, isNumber, isValue, isUndefined, notEmpty} from "../../module/util";
-import {IDataRow, IDataIndice, TIndices} from "../data/IData";
+import {KEY} from "../../module/Cache";
+import {
+	capitalize,
+	getBBox,
+	getPointer,
+	getRectSegList,
+	getUnique,
+	isFunction,
+	isNumber,
+	isObjectType,
+	isUndefined,
+	isValue,
+	notEmpty,
+	parseDate
+} from "../../module/util";
+import type {IDataIndice, IDataRow, TIndices} from "../data/IData";
+import type {IOffset, ShapeElementConfig, UpdateTargetsConfig} from "./IShape";
+
+// Re-export types for backward compatibility
+export type {
+	IOffset,
+	LinearGradientOption,
+	ShapeElementConfig,
+	UpdateTargetsConfig
+} from "./IShape";
+
+/**
+ * Get grouped data point function for y coordinate
+ * - Note: Grouped(stacking) works only for line and bar types
+ * @param {object} d data vlaue
+ * @returns {function|undefined}
+ * @private
+ */
+function _getGroupedDataPointsFn(d) {
+	const $$ = this;
+	let fn;
+
+	if ($$.isLineType(d)) {
+		fn = $$.generateGetLinePoints($$.getShapeIndices($$.isLineType));
+	} else if ($$.isBarType(d)) {
+		fn = $$.generateGetBarPoints($$.getShapeIndices($$.isBarType));
+	}
+
+	return fn;
+}
+
+/**
+ * Get shape color with gradient support
+ * @param {object} d Data object
+ * @param {string} configKey Configuration key for linearGradient (e.g., 'bar_linearGradient', 'area_linearGradient')
+ * @param {(d: IDataRow) => string | null} colorFn Fallback color function when gradient is not enabled
+ * @returns {string | null} Color string or gradient URL
+ * @private
+ */
+export function getShapeColorWithGradient(
+	this: any,
+	d: IDataRow,
+	configKey: string,
+	colorFn: (d: IDataRow) => string | null
+): string | null {
+	return this.config[configKey] ? this.getGradienColortUrl(d.id) : colorFn(d);
+}
+
+/**
+ * Initialize a shape element container
+ * @param {ShapeElementConfig} config Configuration object
+ * @private
+ */
+export function initShapeElement(this: any, config: ShapeElementConfig): void {
+	const {$el} = this;
+	const {elKey, className, cssRules, position} = config;
+	const container = $el.main.select(`.${CLASS.chart}`);
+
+	$el[elKey] = position === "first" ?
+		container.insert("g", ":first-child") :
+		container.append("g");
+
+	$el[elKey].attr("class", className);
+
+	if (cssRules?.length) {
+		$el[elKey].call(this.setCssRule(false, `.${className}`, cssRules));
+	}
+}
+
+/**
+ * Common update targets pattern for shapes
+ * @param {Array} targets Target data
+ * @param {UpdateTargetsConfig} config Configuration object
+ * @returns {d3Selection} Enter selection for additional setup
+ * @private
+ */
+export function updateTargetsForShape(
+	this: any,
+	targets: any[],
+	config: UpdateTargetsConfig
+): d3Selection {
+	const $$ = this;
+	const {$el} = $$;
+	const {type, elKey, containerClass, itemClass, initFn, withFocus = true, withStyles = true} =
+		config;
+
+	if (!$el[elKey]) {
+		initFn.call($$);
+	}
+
+	const classChart = $$.getChartClass(type);
+	const classFocus = withFocus ? $$.classFocus.bind($$) : () => "";
+
+	const mainUpdate = $el.main.select(`.${containerClass}`)
+		.selectAll(`.${itemClass}`)
+		.data($$.filterNullish(targets))
+		.attr("class", d => classChart(d) + classFocus(d));
+
+	const mainEnter = mainUpdate.enter().append("g")
+		.attr("class", classChart);
+
+	if (withStyles) {
+		mainEnter
+			.style("opacity", "0")
+			.style("pointer-events", $$.getStylePropValue("none"));
+	}
+
+	return mainEnter;
+}
 
 export default {
 	/**
@@ -35,23 +157,22 @@ export default {
 	 * @private
 	 */
 	getDrawShape() {
-		type SHAPE = {
-			area?: any;
-			bar?: any;
-			line?: any;
-		};
+		type TShape = {area?: any, bar?: any, line?: any};
 
 		const $$ = this;
 		const isRotated = $$.config.axis_rotated;
-		const {hasRadar} = $$.state;
-		const shape = {type: <SHAPE> {}, indices: <SHAPE> {}, pos: {}};
+		const {hasRadar, hasTreemap} = $$.state;
+		const shape = {type: <TShape>{}, indices: <TShape>{}, pos: {}};
 
-		["bar", "candlestick", "line", "area"].forEach(v => {
+		!hasTreemap && ["bar", "candlestick", "line", "area"].forEach(v => {
 			const name = capitalize(/^(bubble|scatter)$/.test(v) ? "line" : v);
 
-			if ($$.hasType(v) || $$.hasTypeOf(name) || (
-				v === "line" && ($$.hasType("bubble") || $$.hasType("scatter"))
-			)) {
+			if (
+				$$.hasType(v) || $$.hasTypeOf(name) || (
+					v === "line" &&
+					($$.hasType("bubble") || $$.hasType("scatter"))
+				)
+			) {
 				const indices = $$.getShapeIndices($$[`is${name}Type`]);
 				const drawFn = $$[`generateDraw${name}`];
 
@@ -60,10 +181,15 @@ export default {
 			}
 		});
 
-		if (!$$.hasArcType() || hasRadar) {
+		if (!$$.hasArcType() || hasRadar || hasTreemap) {
+			let cx;
+			let cy;
+
 			// generate circle x/y functions depending on updated params
-			const cx = hasRadar ? $$.radarCircleX : (isRotated ? $$.circleY : $$.circleX);
-			const cy = hasRadar ? $$.radarCircleY : (isRotated ? $$.circleX : $$.circleY);
+			if (!hasTreemap) {
+				cx = hasRadar ? $$.radarCircleX : (isRotated ? $$.circleY : $$.circleX);
+				cy = hasRadar ? $$.radarCircleY : (isRotated ? $$.circleX : $$.circleY);
+			}
 
 			shape.pos = {
 				xForText: $$.generateXYForText(shape.indices, true),
@@ -77,16 +203,16 @@ export default {
 	},
 
 	/**
-	 * Get shape's indices according it's position
+	 * Get shape's indices according it's position within each axis tick.
 	 *
 	 * From the below example, indices will be:
 	 * ==> {data1: 0, data2: 0, data3: 1, data4: 1, __max__: 1}
 	 *
-	 *	data1 data3   data1 data3
-	 *	data2 data4   data2 data4
-	 *	-------------------------
-	 *		 0             1
-	 * @param {Function} typeFilter Chart type filter function
+	 * 	data1 data3   data1 data3
+	 * 	data2 data4   data2 data4
+	 * 	-------------------------
+	 * 		 0             1
+	 * @param {function} typeFilter Chart type filter function
 	 * @returns {object} Indices object with its position
 	 */
 	getShapeIndices(typeFilter): TIndices {
@@ -115,10 +241,15 @@ export default {
 						continue;
 					}
 
-					for (let k = 0, row; (row = groups[k]); k++) {
-						if (row in ind) {
-							ind[d.id] = ind[row];
+					for (let k = 0, key; (key = groups[k]); k++) {
+						if (key in ind) {
+							ind[d.id] = ind[key];
 							break;
+						}
+
+						// for same grouped data, add other data to same indices
+						if (d.id !== key && xKey) {
+							ind[key] = ind[d.id] ?? i[xKey];
 						}
 					}
 				}
@@ -158,8 +289,7 @@ export default {
 			return ind;
 		}
 
-		return notEmpty(xs) ?
-			indices[xs[id]] : indices;
+		return notEmpty(xs) ? indices[xs[id]] : indices as IDataIndice;
 	},
 
 	/**
@@ -173,15 +303,19 @@ export default {
 			// if is multiple xs, return total sum of xs' __max__ value
 			Object.keys(indices)
 				.map(v => indices[v].__max__ || 0)
-				.reduce((acc, curr) => acc + curr) : (indices as IDataIndice).__max__;
+				.reduce((acc, curr) => acc + curr) :
+			(indices as IDataIndice).__max__;
 	},
 
-	getShapeX(offset, indices, isSub?: boolean): (d) => number {
+	getShapeX(offset: IOffset, indices, isSub?: boolean): (d) => number {
 		const $$ = this;
 		const {config, scale} = $$;
 		const currScale = isSub ? scale.subX : (scale.zoom || scale.x);
+		const barOverlap = config.bar_overlap;
 		const barPadding = config.bar_padding;
 		const sum = (p, c) => p + c;
+
+		// total shapes half width
 		const halfWidth = isObjectType(offset) && (
 			offset._$total.length ? offset._$total.reduce(sum) / 2 : 0
 		);
@@ -196,15 +330,20 @@ export default {
 				const xPos = currScale(d.x, true);
 
 				if (halfWidth) {
-					x = xPos - (offset[d.id] || offset._$width) +
+					const offsetWidth = offset[d.id] || offset._$width;
+
+					x = barOverlap ? xPos - offsetWidth / 2 : xPos - offsetWidth +
 						offset._$total.slice(0, index + 1).reduce(sum) -
 						halfWidth;
 				} else {
-					x = xPos - (isNumber(offset) ? offset : offset._$width) * (targetsNum / 2 - index);
+					x = xPos - (isNumber(offset) ? offset : offset._$width) *
+							(targetsNum / 2 - (
+								barOverlap ? 1 : index
+							));
 				}
 			}
 
-			// adjust x position for bar.padding optionq
+			// adjust x position for bar.padding option
 			if (offset && x && targetsNum > 1 && barPadding) {
 				if (index) {
 					x += barPadding * index;
@@ -230,6 +369,8 @@ export default {
 
 			if (isNumber(d)) {
 				value = d;
+			} else if ($$.isAreaRangeType(d)) {
+				value = $$.getBaseValue(d, "mid");
 			} else if (isStackNormalized) {
 				value = $$.getRatio("index", d, true);
 			} else if ($$.isBubbleZType(d)) {
@@ -261,13 +402,27 @@ export default {
 
 	/**
 	 * Get Shape's offset data
-	 * @param {Function} typeFilter Type filter function
+	 * @param {function} typeFilter Type filter function
 	 * @returns {object}
 	 * @private
 	 */
 	getShapeOffsetData(typeFilter) {
 		const $$ = this;
-		const targets = $$.orderTargets($$.filterTargetsToShow($$.data.targets.filter(typeFilter, $$)));
+		const targets = $$.orderTargets(
+			$$.filterTargetsToShow($$.data.targets.filter(typeFilter, $$))
+		);
+
+		// Create cache key based on target IDs
+		const targetIds = targets.map(t => t.id).join("_");
+		const cacheKey = `${KEY.shapeOffset}_${targetIds}`;
+
+		// Check if result is already cached
+		const cachedData = $$.cache.get(cacheKey);
+
+		if (cachedData) {
+			return cachedData;
+		}
+
 		const isStackNormalized = $$.isStackNormalized();
 
 		const shapeOffsetTargets = targets.map(target => {
@@ -299,12 +454,20 @@ export default {
 			return out;
 		}, {});
 
-		return {indexMapByTargetId, shapeOffsetTargets};
+		const result = {indexMapByTargetId, shapeOffsetTargets};
+
+		// Cache the result
+		$$.cache.add(cacheKey, result);
+
+		return result;
 	},
 
 	getShapeOffset(typeFilter, indices, isSub?: boolean): Function {
 		const $$ = this;
-		const {shapeOffsetTargets, indexMapByTargetId} = $$.getShapeOffsetData(typeFilter);
+		const {shapeOffsetTargets, indexMapByTargetId} = $$.getShapeOffsetData(
+			typeFilter
+		);
+		const groupsZeroAs = $$.config.data_groupsZeroAs;
 
 		return (d, idx) => {
 			const {id, value, x} = d;
@@ -316,18 +479,23 @@ export default {
 				return scale(value[0]);
 			}
 
-			const y0 = scale($$.getShapeYMin(id));
-
 			const dataXAsNumber = Number(x);
+			const y0 = scale(groupsZeroAs === "zero" ? 0 : $$.getShapeYMin(id));
 			let offset = y0;
 
 			shapeOffsetTargets
-				.filter(t => t.id !== id)
+				.filter(t => t.id !== id && ind[t.id] === ind[id])
 				.forEach(t => {
-					const {id: tid, rowValueMapByXValue, rowValues, values: tvalues} = t;
+					const {
+						id: tid,
+						rowValueMapByXValue,
+						rowValues,
+						values: tvalues
+					} = t;
 
 					// for same stacked group (ind[tid] === ind[id])
-					if (ind[tid] === ind[id] && indexMapByTargetId[tid] < indexMapByTargetId[id]) {
+					if (indexMapByTargetId[tid] < indexMapByTargetId[id]) {
+						const rValue = tvalues[dataXAsNumber];
 						let row = rowValues[idx];
 
 						// check if the x values line up
@@ -335,8 +503,18 @@ export default {
 							row = rowValueMapByXValue[dataXAsNumber];
 						}
 
-						if (row?.value * value >= 0 && isNumber(tvalues[dataXAsNumber])) {
-							offset += scale(tvalues[dataXAsNumber]) - y0;
+						if (row?.value * value >= 0 && isNumber(rValue)) {
+							const addOffset = value === 0 ?
+								(
+									(groupsZeroAs === "positive" &&
+										rValue > 0) ||
+									(groupsZeroAs === "negative" && rValue < 0)
+								) :
+								true;
+
+							if (addOffset) {
+								offset += scale(rValue) - y0;
+							}
 						}
 					}
 				});
@@ -345,24 +523,58 @@ export default {
 		};
 	},
 
-	getBarW(type, axis, targetsNum: number): number {
+	/**
+	 * Get data's y coordinate
+	 * @param {object} d Target data
+	 * @param {number} i Index number
+	 * @returns {number} y coordinate
+	 * @private
+	 */
+	circleY(d: IDataRow, i: number): number {
 		const $$ = this;
-		const {config, org, scale} = $$;
-		const maxDataCount = $$.getMaxDataCount();
-		const isGrouped = type === "bar" && config.data_groups.length;
-		const configName = `${type}_width`;
+		const id = d.id;
+		let points;
 
-		const tickInterval = scale.zoom && !$$.axis.isCategorized() ?
-			(org.xDomain.map(v => scale.zoom(v))
-				.reduce((a, c) => Math.abs(a) + c) / maxDataCount
-			) : axis.tickInterval(maxDataCount);
+		if ($$.isGrouped(id)) {
+			points = _getGroupedDataPointsFn.bind($$)(d);
+		}
+
+		return points ? points(d, i)[0][1] : $$.getYScaleById(id)($$.getBaseValue(d));
+	},
+
+	getBarW(type, axis, targetsNum: number): number | IOffset {
+		const $$ = this;
+		const {config, org, scale, state} = $$;
+		const maxDataCount = $$.getMaxDataCount();
+		const isGrouped = type === "bar" && config.data_groups?.length;
+		const configName = `${type}_width`;
+		const {k} = $$.getZoomTransform?.() ?? {k: 1};
+		const xMinMax = <[number, number]>[
+			config.axis_x_min ?? org.xDomain[0],
+			config.axis_x_max ?? org.xDomain[1]
+		].map($$.axis.isTimeSeries() ? parseDate.bind($$) : Number);
+
+		let tickInterval = axis.tickInterval(maxDataCount);
+
+		if (scale.zoom && !$$.axis.isCategorized() && k > 1) {
+			const isSameMinMax = xMinMax.every((v, i) => v === org.xDomain[i]);
+
+			tickInterval = org.xDomain.map((v, i) => {
+				const value = isSameMinMax ? v : v - Math.abs(xMinMax[i]);
+
+				return scale.zoom(value);
+			}).reduce((a, c) => Math.abs(a) + c) / maxDataCount;
+		}
 
 		const getWidth = (id?: string) => {
 			const width = id ? config[configName][id] : config[configName];
 			const ratio = id ? width.ratio : config[`${configName}_ratio`];
 			const max = id ? width.max : config[`${configName}_max`];
-			const w = isNumber(width) ?
-				width : targetsNum ? (tickInterval * ratio) / targetsNum : 0;
+			const w = isNumber(width) ? width : (
+				isFunction(width) ?
+					width.call($$, state.width, targetsNum, maxDataCount) :
+					(targetsNum ? (tickInterval * ratio) / targetsNum : 0)
+			);
 
 			return max && w > max ? max : w;
 		};
@@ -394,7 +606,7 @@ export default {
 	getShapeByIndex(shapeName: string, i: number, id?: string): d3Selection {
 		const $$ = this;
 		const {$el} = $$;
-		const suffix = (isValue(i) ? `-${i}` : ``);
+		const suffix = isValue(i) ? `-${i}` : ``;
 		let shape = $el[shapeName];
 
 		// filter from shape reference if has
@@ -403,8 +615,12 @@ export default {
 				.filter(d => (id ? d.id === id : true))
 				.filter(d => (isValue(i) ? d.index === i : true));
 		} else {
-			shape = (id ? $el.main
-				.selectAll(`.${CLASS[`${shapeName}s`]}${$$.getTargetSelectorSuffix(id)}`) : $el.main)
+			shape = (id ?
+				$el.main
+					.selectAll(
+						`.${CLASS[`${shapeName}s`]}${$$.getTargetSelectorSuffix(id)}`
+					) :
+				$el.main)
 				.selectAll(`.${CLASS[shapeName]}${suffix}`);
 		}
 
@@ -420,8 +636,11 @@ export default {
 			isWithin = false;
 		} else if ($$.hasValidPointType?.(that.nodeName)) {
 			isWithin = $$.isStepType(d) ?
-				$$.isWithinStep(that, $$.getYScaleById(d.id)(d.value)) :
-				$$.isWithinCircle(that, $$.isBubbleType(d) ? $$.pointSelectR(d) * 1.5 : 0);
+				$$.isWithinStep(that, $$.getYScaleById(d.id)($$.getBaseValue(d))) :
+				$$.isWithinCircle(
+					that,
+					$$.isBubbleType(d) ? $$.pointSelectR(d) * 1.5 : 0
+				);
 		} else if (that.nodeName === "path") {
 			isWithin = shape.classed(CLASS.bar) ? $$.isWithinBar(that) : true;
 		}
@@ -434,11 +653,11 @@ export default {
 		const interpolation = $$.getInterpolateType(d);
 
 		return {
-			"basis": d3CurveBasis,
+			basis: d3CurveBasis,
 			"basis-closed": d3CurveBasisClosed,
 			"basis-open": d3CurveBasisOpen,
-			"bundle": d3CurveBundle,
-			"cardinal": d3CurveCardinal,
+			bundle: d3CurveBundle,
+			cardinal: d3CurveCardinal,
 			"cardinal-closed": d3CurveCardinalClosed,
 			"cardinal-open": d3CurveCardinalOpen,
 			"catmull-rom": d3CurveCatmullRom,
@@ -446,10 +665,10 @@ export default {
 			"catmull-rom-open": d3CurveCatmullRomOpen,
 			"monotone-x": d3CurveMonotoneX,
 			"monotone-y": d3CurveMonotoneY,
-			"natural": d3CurveNatural,
+			natural: d3CurveNatural,
 			"linear-closed": d3CurveLinearClosed,
-			"linear": d3CurveLinear,
-			"step": d3CurveStep,
+			linear: d3CurveLinear,
+			step: d3CurveStep,
 			"step-after": d3CurveStepAfter,
 			"step-before": d3CurveStepBefore
 		}[interpolation];
@@ -461,11 +680,9 @@ export default {
 		const type = config.spline_interpolation_type;
 		const interpolation = $$.isInterpolationType(type) ? type : "cardinal";
 
-		return $$.isSplineType(d) ?
-			interpolation : (
-				$$.isStepType(d) ?
-					config.line_step_type : "linear"
-			);
+		return $$.isSplineType(d) ? interpolation : (
+			$$.isStepType(d) ? config.line_step_type : "linear"
+		);
 	},
 
 	isWithinBar(that): boolean {
@@ -475,7 +692,7 @@ export default {
 		const x = Math.min(seg0.x, seg1.x);
 		const y = Math.min(seg0.y, seg1.y);
 		const offset = this.config.bar_sensitivity;
-		const {width, height} = that.getBBox();
+		const {width, height} = getBBox(that, true);
 		const sx = x - offset;
 		const ex = x + width + offset;
 		const sy = y + height + offset;

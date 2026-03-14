@@ -1,0 +1,3 @@
+{
+    "*.ts": ["dprint fmt", "npm run lint"]
+}

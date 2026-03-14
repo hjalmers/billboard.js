@@ -37,6 +37,11 @@ body {
     transition: all 0.5s ease;
 }
 
+.dark #sidebar-wrapper {
+    filter: invert(1);
+    background-color: #fb3b3b;
+}
+
 #sidebar-wrapper .link {
     font-family: Raleway;
     text-align: center;
@@ -145,6 +150,7 @@ pre {
 
 .code {
     display: none;
+    margin-top: 20px;
 }
 
 .code p {
@@ -155,12 +161,14 @@ pre {
 
 .code .html {
     background-color: #eefbff;
+    max-height: 5;
 }
 
 .code .js {
     position: relative;
     font-family: Raleway;
     font-size: 11px;
+    height: 1;
 }
 
 .code .js .focus {
@@ -243,8 +251,11 @@ div.row {
 
 @media(max-width:768px) {
     #menu-toggle {
-        display: inline-block;
         float: right;
+        position: sticky;
+        top: 10px;
+        border: solid 1px #eee;
+        z-index: 100;
     }
 
     #wrapper {
@@ -319,6 +330,48 @@ div.row {
     text-decoration: underline;
 }
 
+#exportPreserveFontStyle svg {
+    font-family: 'Alfa Slab One';
+}
+
+#fitPadding_1 svg {
+    border: 1px dashed blue;
+    margin-bottom: 20px;
+}
+
+#fitPadding_2 svg {
+    border: 1px dashed red;
+}
+
+#donutNeedle_1 .bb-chart-arcs-title, #donutNeedle_2 .bb-chart-arcs-title {
+    font-size: 3em;
+    fill: blue;
+    transform: translateY(40px);
+}
+
+.dark #donutNeedle_1 .bb-chart-arcs-title, .dark #donutNeedle_2 .bb-chart-arcs-title {
+    fill: #828181;
+}
+
+#gaugeNeedle_1 .bb-chart-arcs-gauge-title tspan:first-child {
+    font-size: 0.3em;
+}
+  
+#gaugeNeedle_1 .bb-chart-arcs-gauge-title {
+    transform: translateY(-80px);
+    font-size: 4em;
+}
+  
+#gaugeNeedle_2 .bb-chart-arcs-gauge-title {
+    font-size: 3.5em;
+    fill: red;
+    transform: translateY(-20px);
+}
+
+.chart_area:has(#resizeParent) {
+    border: solid 1px red;
+}
+
 /* Style For Region */
 #styleForRegion .bb-region-0 {fill:red;}
 #styleForRegion .bb-region.foo {fill:green;}
@@ -374,5 +427,16 @@ div.row {
 /* Background */
 .myBgClass { transform: scale(0.9) translate(15px, -10px); opacity: 0.1; }
 
-/* FocusedGridLines */
-#focusedGridLines_1 line.bb-xgrid-focus, #focusedGridLines_1 line.bb-ygrid-focus { stroke: blue; stroke-dasharray: 2 2; }
+.chart_area hr {
+    margin: 10px auto 15px auto;
+    border-top: 1px dotted #a7a7a7;
+}
+
+#axisEvalTextSize_1 .bb-axis-x text{font-size: 20px;}
+#axisEvalTextSize_1 .bb-axis-y text{font-size: 35px;}
+#axisEvalTextSize_1 .bb-axis-y2 text{font-size: 25px;}
+
+/* div[id$="_2"], div[id$="_3"], div[id$="_4"], div[id$="_5"] {
+    margin: 20px 0;
+    box-shadow: 0 -1px 0 #ccc;
+} */

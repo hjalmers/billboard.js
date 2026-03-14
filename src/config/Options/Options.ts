@@ -3,13 +3,14 @@
  * billboard.js project is licensed under the MIT license
  */
 // common
-import main from "./common/main";
-import data from "./data/data";
+import boost from "./common/boost";
 import color from "./common/color";
-import interaction from "./interaction/interaction";
 import legend from "./common/legend";
+import main from "./common/main";
 import title from "./common/title";
 import tooltip from "./common/tooltip";
+import data from "./data/data";
+import interaction from "./interaction/interaction";
 
 import {deepClone} from "../../module/util";
 
@@ -30,6 +31,7 @@ export default class Options {
 	constructor() {
 		return deepClone(
 			main,
+			boost,
 			data,
 			color,
 			interaction,

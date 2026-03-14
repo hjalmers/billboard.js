@@ -39,22 +39,44 @@ export default class State {
 			xAxisHeight: 0,
 
 			hasAxis: false,
+			hasFunnel: false,
 			hasRadar: false,
+			hasTreemap: false,
+
+			// for data CSS rule index (used when boost.useCssRule is true)
+			cssRule: {},
+
+			// Data loading state (used in scale calculation)
+			loading: <"append" | "load" | undefined>undefined,
+
+			// Zoom/subchart domain (different from current.domain which is for rendering)
+			domain: <number[] | undefined>undefined,
 
 			current: {
+				// current domain value. Assigned when is zoom is called
+				domain: undefined,
+
 				// chart whole dimension
 				width: 0,
 				height: 0,
 				dataMax: 0,
 
-				maxTickWidths: {
-					x: {size: 0, ticks: <number[]> [], clipPath: 0, domain: ""},
-					y: {size: 0, domain: ""},
-					y2: {size: 0, domain: ""}
+				maxTickSize: {
+					x: {
+						width: 0,
+						height: 0,
+						ticks: <(number | string)[]>[],
+						clipPath: 0,
+						domain: ""
+					},
+					y: {width: 0, height: 0, domain: ""},
+					y2: {width: 0, height: 0, domain: ""}
 				},
 
 				// current used chart type list
-				types: <string[]> [],
+				types: <string[]>[],
+				needle: undefined, // arc needle current value
+				zoomDomain: null // zoomed domain value
 			},
 
 			// legend
@@ -107,7 +129,7 @@ export default class State {
 				pathGrid: ""
 			},
 
-			// status
+			// state
 			event: null, // event object
 			dragStart: null,
 			dragging: false,
@@ -124,28 +146,33 @@ export default class State {
 			hasPositiveValue: true,
 
 			orgAreaOpacity: "0.2",
+			orgConfig: {}, // user original genration config
 
 			// ID strings
-			hiddenTargetIds: <string[]> [],
-			hiddenLegendIds: <string[]> [],
-			focusedTargetIds: <string[]> [],
-			defocusedTargetIds: <string[]> [],
+			hiddenTargetIds: <string[]>[],
+			hiddenLegendIds: <string[]>[],
+			focusedTargetIds: <string[]>[],
+			defocusedTargetIds: <string[]>[],
 
 			// value for Arc
 			radius: 0,
-			innerRadius: <{[key: string]: number}|number> 0,
-			outerRadius: <{[key: string]: number}|number|undefined> undefined,
+			innerRadius: <Record<string, number> | number>0,
+			outerRadius: <Record<string, number> | number | undefined>undefined,
 			innerRadiusRatio: 0,
 			gaugeArcWidth: 0,
 			radiusExpanded: 0,
 
 			// xgrid attribute
 			xgridAttr: {
-				x1: <number | null> null,
-				x2: <number | null> null,
-				y1: <number | null> null,
-				y2: <number | null> null
-			}
+				x1: <number | null>null,
+				x2: <number | null>null,
+				y1: <number | null>null,
+				y2: <number | null>null
+			},
+
+			// RAF batching for zoom/drag interactions
+			pendingRaf: <number | null>null,
+			rafBatchQueue: <Array<() => void>>[]
 		};
 	}
 }

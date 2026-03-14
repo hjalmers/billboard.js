@@ -2,11 +2,10 @@
  * Copyright (c) 2021 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
+import type {IData} from "../../ChartInternal/data/IData";
 import {$COMMON} from "../../config/classes";
 import Plugin from "../Plugin";
 import Options from "./Options";
-import {IData} from "../../ChartInternal/data/IData";
-import {loadConfig} from "../../config/config";
 
 /**
  * Sparkline plugin.<br>
@@ -55,7 +54,6 @@ import {loadConfig} from "../../config/config";
  */
 export default class Sparkline extends Plugin {
 	static version = `0.0.1`;
-	private config;
 	private element;
 
 	constructor(options) {
@@ -66,7 +64,7 @@ export default class Sparkline extends Plugin {
 	}
 
 	$beforeInit(): void {
-		loadConfig.call(this, this.options);
+		this.loadConfig();
 
 		this.validate();
 		this.element = [].slice.call(document.querySelectorAll(this.config.selector));
@@ -119,16 +117,26 @@ export default class Sparkline extends Plugin {
 
 		config.legend_show = false;
 		config.resize_auto = false;
-
 		config.axis_x_show = false;
-		config.axis_x_padding = {
-			left: 15,
-			right: 15,
-			unit: "px"
-		};
+
+		// set default axes padding
+		if (config.padding !== false) {
+			const hasOption = o => Object.keys(o || {}).length > 0;
+
+			if (hasOption(config.axis_x_padding)) {
+				config.axis_x_padding = {
+					left: 15,
+					right: 15,
+					unit: "px"
+				};
+			}
+
+			if (hasOption(config.axis_y_padding)) {
+				config.axis_y_padding = 5;
+			}
+		}
 
 		config.axis_y_show = false;
-		config.axis_y_padding = 5;
 
 		if (!config.tooltip_position) {
 			config.tooltip_position = function(data, width, height) {
@@ -150,8 +158,7 @@ export default class Sparkline extends Plugin {
 	}
 
 	$init(): void {
-		const {$$} = this;
-		const {$el} = $$;
+		const {$$: {$el}} = this;
 
 		// make disable-ish main chart element
 		$el.chart
@@ -159,7 +166,7 @@ export default class Sparkline extends Plugin {
 			.style("height", "0")
 			.style("pointer-events", "none");
 
-		document.body.appendChild($el.tooltip.node());
+		$el.tooltip?.node() && document.body.appendChild($el.tooltip.node());
 	}
 
 	$afterInit(): void {
@@ -178,7 +185,9 @@ export default class Sparkline extends Plugin {
 	 * @private
 	 */
 	bindEvents(bind = true): void {
-		if (this.$$.config.interaction_enabled) {
+		const {$$: {config}} = this;
+
+		if (config.interaction_enabled && config.tooltip_show) {
 			const method = `${bind ? "add" : "remove"}EventListener`;
 
 			this.element
@@ -210,6 +219,11 @@ export default class Sparkline extends Plugin {
 		}
 
 		$$.state.event = e;
+
+		if ($$.isPointFocusOnly?.() && d) {
+			$$.showCircleFocus?.([d]);
+		}
+
 		$$.setExpand(index, data.id, true);
 		$$.showTooltip([d], e.target);
 	}
@@ -218,7 +232,9 @@ export default class Sparkline extends Plugin {
 		const {$$} = this;
 
 		$$.state.event = e;
-		$$.unexpandCircles();
+
+		$$.isPointFocusOnly() ? $$.hideCircleFocus() : $$.unexpandCircles();
+
 		$$.hideTooltip();
 	}
 

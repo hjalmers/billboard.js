@@ -3,29 +3,16 @@
  * billboard.js project is licensed under the MIT license
  */
 import {zoomIdentity as d3ZoomIdentity, zoomTransform as d3ZoomTransform} from "d3-zoom";
+import type {TDomainRange} from "../../ChartInternal/data/IData";
 import {extend, getMinMax, isDefined, isObject, parseDate} from "../../module/util";
 
 /**
- * Check if the given domain is within zoom range
- * @param {Array} domain Target domain value
- * @param {Array} current Current zoom domain value
- * @param {Array} range Zoom range value
- * @returns {boolean}
- * @private
- */
-function withinRange(domain: (number|Date)[], current, range: number[]): boolean {
-	const [min, max] = range;
-
-	return domain.every((v, i) => (
-		i === 0 ? (v >= min) : (v <= max)
-	) && !(domain.every((v, i) => v === current[i])));
-}
-
-/**
  * Zoom by giving x domain range.
- * - **NOTE:**
+ * - **ℹ️ NOTE:**
  *  - For `wheel` type zoom, the minimum zoom range will be set as the given domain range. To get the initial state, [.unzoom()](#unzoom) should be called.
  *  - To be used [zoom.enabled](Options.html#.zoom) option should be set as `truthy`.
+ *  - When x axis type is `category`, domain range should be specified as index numbers.
+ *  - Due to the limitations of floating point precision, domain value may not be exact returning approximately values.
  * @function zoom
  * @instance
  * @memberof Chart
@@ -35,64 +22,65 @@ function withinRange(domain: (number|Date)[], current, range: number[]): boolean
  *  // Zoom to specified domain range
  *  chart.zoom([10, 20]);
  *
- *  // For timeseries, the domain value can be string, but the format should match with the 'data.xFormat' option.
+ *  // For timeseries x axis, the domain value can be string, but the format should match with the 'data.xFormat' option.
  *  chart.zoom(["2021-02-03", "2021-02-08"]);
  *
+ *  // For category x axis, the domain value should be index number.
+ *  chart.zoom([0, 3]);
+ *
  *  // Get the current zoomed domain range
+ *  // Domain value may not be exact returning approximately values.
  *  chart.zoom();
  */
-const zoom = function(domainValue?: (Date|number|string)[]): (Date|number)[]|undefined {
+// NOTE: declared function assigning to variable to prevent duplicated method generation in JSDoc.
+const zoom = function<T = TDomainRange>(domainValue?: T): T | undefined {
 	const $$ = this.internal;
-	const {$el, axis, config, org, scale} = $$;
-	const isRotated = config.axis_rotated;
+	const {axis, config, org, scale, state} = $$;
 	const isCategorized = axis.isCategorized();
-	let domain = domainValue;
+	let domain;
 
-	if (config.zoom_enabled && domain) {
-		if (axis.isTimeSeries()) {
-			domain = domain.map(x => parseDate.bind($$)(x));
-		}
+	if (config.zoom_enabled) {
+		domain = domainValue;
 
-		if (withinRange(domain as (number|Date)[], $$.getZoomDomain(true), $$.getZoomDomain())) {
-			if (isCategorized) {
-				domain = domain.map((v, i) => Number(v) + (i === 0 ? 0 : 1));
+		if (Array.isArray(domain)) {
+			if (axis.isTimeSeries()) {
+				domain = domain.map(x => parseDate.bind($$)(x));
 			}
 
-			// hide any possible tooltip show before the zoom
-			$$.api.tooltip.hide();
+			const isWithinRange = $$.withinRange(
+				domain,
+				$$.getZoomDomain("zoom", true),
+				$$.getZoomDomain("zoom")
+			);
 
-			if (config.subchart_show) {
-				const x = scale.zoom || scale.x;
+			if (isWithinRange) {
+				state.domain = domain;
 
-				$$.brush.getSelection().call($$.brush.move, domain.map(x));
-				// resultDomain = domain;
-			} else {
-				// in case of 'config.zoom_rescale=true', use org.xScale
-				const x = isCategorized ? scale.x.orgScale() : (org.xScale || scale.x);
+				domain = $$.getZoomDomainValue(domain);
 
-				// Get transform from given domain value
-				// https://github.com/d3/d3-zoom/issues/57#issuecomment-246434951
-				const translate = [-x(domain[0]), 0];
-				const transform = d3ZoomIdentity
-					.scale(x.range()[1] / (
-						x(domain[1]) - x(domain[0])
-					))
-					.translate(
-						...(isRotated ? translate.reverse() : translate) as [number, number]
-					);
+				// hide any possible tooltip show before the zoom
+				$$.api.tooltip.hide();
 
-				$el.eventRect
-					.call($$.zoom.transform, transform);
+				if (config.subchart_show) {
+					const x = scale.zoom || scale.x;
+
+					$$.brush.getSelection().call($$.brush.move, domain.map(x));
+					// resultDomain = domain;
+				} else {
+					// in case of 'config.zoom_rescale=true', use org.xScale
+					const x = isCategorized ? scale.x.orgScale() : (org.xScale || scale.x);
+
+					$$.updateCurrentZoomTransform(x, domain);
+				}
+
+				$$.setZoomResetButton();
 			}
-
-			$$.setZoomResetButton();
+		} else {
+			domain = $$.zoom.getDomain();
 		}
-	} else {
-		domain = scale.zoom ?
-			scale.zoom.domain() : scale.x.orgDomain();
 	}
 
-	return domain as (Date|number)[];
+	return state.domain ?? domain;
 };
 
 extend(zoom, {
@@ -114,7 +102,7 @@ extend(zoom, {
 	 *  // Disable zooming
 	 *  chart.zoom.enable(false);
 	 */
-	enable: function(enabled: boolean | "wheel" | "drag" | any): void {
+	enable(enabled: boolean | "wheel" | "drag" | any): void {
 		const $$ = this.internal;
 		const {config} = $$;
 
@@ -145,7 +133,7 @@ extend(zoom, {
 	 *  // Set maximum range value
 	 *  chart.zoom.max(20);
 	 */
-	max: function(max?: number): number {
+	max(max?: number): number {
 		const $$ = this.internal;
 		const {config, org: {xDomain}} = $$;
 
@@ -167,7 +155,7 @@ extend(zoom, {
 	 *  // Set minimum range value
 	 *  chart.zoom.min(-1);
 	 */
-	min: function(min?: number): number {
+	min(min?: number): number {
 		const $$ = this.internal;
 		const {config, org: {xDomain}} = $$;
 
@@ -195,7 +183,7 @@ extend(zoom, {
 	 *      max: 100
 	 *  });
 	 */
-	range: function(range): {min: (number|undefined)[], max: (number|undefined)[]} {
+	range(range): {min: (number | undefined)[], max: (number | undefined)[]} {
 		const zoom = this.zoom;
 
 		if (isObject(range)) {
@@ -226,9 +214,9 @@ export default {
 	 */
 	unzoom(): void {
 		const $$ = this.internal;
-		const {config, $el: {eventRect, zoomResetBtn}} = $$;
+		const {config, $el: {eventRect, zoomResetBtn}, scale: {zoom}, state} = $$;
 
-		if ($$.scale.zoom) {
+		if (zoom) {
 			config.subchart_show ?
 				$$.brush.getSelection().call($$.brush.move, null) :
 				$$.zoom.updateTransformScale(d3ZoomIdentity);
@@ -240,6 +228,8 @@ export default {
 			if (d3ZoomTransform(eventRect.node()) !== d3ZoomIdentity) {
 				$$.zoom.transform(eventRect, d3ZoomIdentity);
 			}
+
+			state.domain = undefined;
 		}
 	}
 };

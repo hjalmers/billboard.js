@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
 		"module": "ES2015",
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"noImplicitAny": false,
 		"noImplicitThis": false,
 		"strictNullChecks": true,
@@ -12,11 +12,15 @@
 		]
 	},
 	"include": [
-		"src/**/*.ts"
+		"src/**/index*.ts",
 	],
 	"exclude": [
 		"test/**/*.ts"
 	],
 	"noEmit": true,
-	"forceConsistentCasingInFileNames": true
+	"forceConsistentCasingInFileNames": true,
+	"types": [
+      "@vitest/browser/providers/webdriverio",
+      "@vitest/browser/providers/playwright"
+    ]
 }

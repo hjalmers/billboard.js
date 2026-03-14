@@ -2,7 +2,8 @@
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-import {Selection} from "d3-selection";
+import type {Selection} from "d3-selection";
+import type {Transition} from "d3-transition";
 
 export type PrimitiveArray = Array<
 	string | boolean | number | Date | null |
@@ -10,22 +11,27 @@ export type PrimitiveArray = Array<
 >;
 export type ArrayOrString = string[] | string;
 export type d3Selection = Selection<any, any, any, any>;
+export type d3Transition = Transition<any, any, any, any>;
 export type ChartTypes = "area"
 	| "area-line-range"
 	| "area-spline"
 	| "area-spline-range"
 	| "area-step"
+	| "area-step-range"
 	| "bar"
 	| "bubble"
 	| "candlestick"
 	| "donut"
+	| "funnel"
 	| "gauge"
 	| "line"
 	| "pie"
+	| "polar"
 	| "radar"
 	| "scatter"
 	| "spline"
-	| "step";
+	| "step"
+	| "treemap";
 
 export type GaugeTypes = "single" | "multi";
 export type AxisType = "x" | "y" | "y2";
@@ -51,7 +57,7 @@ export interface DataItem<T=number> {
 
 export type DataArray = DataRow[];
 
-export interface RegionsType {
+export interface DataRegionsType {
 	[key: string]: {
 		start?: number;
 		end?: number;

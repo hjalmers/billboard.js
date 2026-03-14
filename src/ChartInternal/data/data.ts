@@ -2,15 +2,18 @@
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
+import {select as d3Select} from "d3-selection";
 import {$BAR, $CANDLESTICK, $COMMON} from "../../config/classes";
 import {KEY} from "../../module/Cache";
-import {IData, IDataRow} from "./IData";
 import {
 	findIndex,
+	getScrollPosition,
+	getTransformCTM,
 	getUnique,
 	hasValue,
+	hasViewBox,
 	isArray,
-	isboolean,
+	isBoolean,
 	isDefined,
 	isFunction,
 	isNumber,
@@ -24,6 +27,7 @@ import {
 	parseDate,
 	sortValue
 } from "../../module/util";
+import type {IData, IDataPoint, IDataRow} from "./IData";
 
 export default {
 	isX(key) {
@@ -42,15 +46,58 @@ export default {
 	isStackNormalized(): boolean {
 		const {config} = this;
 
-		return !!(config.data_stack_normalize && config.data_groups.length);
+		return !!(
+			(config.data_stack_normalize === true ||
+				isObjectType(config.data_stack_normalize)) &&
+			config.data_groups.length
+		);
 	},
 
-	isGrouped(id) {
+	/**
+	 * Check if stack normalization should be applied per group
+	 * @returns {boolean}
+	 * @private
+	 */
+	isStackNormalizedPerGroup(): boolean {
+		const {config} = this;
+
+		return !!(
+			isObjectType(config.data_stack_normalize) &&
+			config.data_stack_normalize?.perGroup &&
+			config.data_groups.length
+		);
+	},
+
+	/**
+	 * Check if given id is grouped data or has grouped data
+	 * @param {string} id Data id value
+	 * @returns {boolean} is grouped data or has grouped data
+	 * @private
+	 */
+	isGrouped(id?: string): boolean {
 		const groups = this.config.data_groups;
 
-		return id ?
-			groups.some(v => v.indexOf(id) >= 0 && v.length > 1) :
-			groups.length > 0;
+		return id ? groups.some(v => v.indexOf(id) >= 0 && v.length > 1) : groups.length > 0;
+	},
+
+	/**
+	 * Check if the given axis has any grouped data
+	 * @param {string} axisId Axis ID (e.g., "y", "y2")
+	 * @returns {boolean} true if axis has grouped data
+	 * @private
+	 */
+	hasAxisGroupedData(axisId: "y" | "y2"): boolean {
+		const $$ = this;
+		const {axis} = $$;
+		const targets = $$.data.targets;
+
+		// Get all data IDs that belong to this axis
+		const axisDataIds = targets
+			.filter(t => axis.getId(t.id) === axisId)
+			.map(t => t.id);
+
+		// Check if any of the axis data IDs are in groups
+		return axisDataIds.some(id => $$.isGrouped(id));
 	},
 
 	getXKey(id) {
@@ -58,7 +105,8 @@ export default {
 		const {config} = $$;
 
 		return config.data_x ?
-			config.data_x : (notEmpty(config.data_xs) ? config.data_xs[id] : null);
+			config.data_x :
+			(notEmpty(config.data_xs) ? config.data_xs[id] : null);
 	},
 
 	getXValuesOfXKey(key, targets) {
@@ -82,7 +130,7 @@ export default {
 	 * @returns {number} index number
 	 * @private
 	 */
-	getIndexByX(x: Date|number|string, basedX: (Date|number|string)[]): number {
+	getIndexByX(x: Date | number | string, basedX: (Date | number | string)[]): number {
 		const $$ = this;
 
 		return basedX ?
@@ -94,8 +142,10 @@ export default {
 		const $$ = this;
 
 		return id in $$.data.xs &&
-			$$.data.xs[id] &&
-			isValue($$.data.xs[id][i]) ? $$.data.xs[id][i] : i;
+				$$.data.xs[id] &&
+				isValue($$.data.xs[id][i]) ?
+			$$.data.xs[id][i] :
+			i;
 	},
 
 	getOtherTargetXs(): string | null {
@@ -120,11 +170,17 @@ export default {
 		});
 	},
 
+	/**
+	 * Determine if x axis is multiple
+	 * @returns {boolean} true: multiple, false: single
+	 * @private
+	 */
 	isMultipleX(): boolean {
-		return notEmpty(this.config.data_xs) ||
-			!this.config.data_xSort ||
+		return !this.config.axis_x_forceAsSingle && (
+			notEmpty(this.config.data_xs) ||
 			this.hasType("bubble") ||
-			this.hasType("scatter");
+			this.hasType("scatter")
+		);
 	},
 
 	addName(data) {
@@ -271,7 +327,7 @@ export default {
 	 * @private
 	 * @returns {{min: Array, max: Array}}
 	 */
-	getMinMaxData() {
+	getMinMaxData(): {min: IDataRow[], max: IDataRow[]} {
 		const $$ = this;
 		const cacheKey = KEY.dataMinMax;
 		let minMaxData = $$.cache.get(cacheKey);
@@ -283,9 +339,12 @@ export default {
 			let min = [];
 			let max = [];
 
+			// Cache the getFilteredDataByValue function calls
+			const {min: minVal, max: maxVal} = minMax;
+
 			data.forEach(v => {
-				const minData = $$.getFilteredDataByValue(v, minMax.min);
-				const maxData = $$.getFilteredDataByValue(v, minMax.max);
+				const minData = $$.getFilteredDataByValue(v, minVal);
+				const maxData = $$.getFilteredDataByValue(v, maxVal);
 
 				if (minData.length) {
 					min = min.concat(minData);
@@ -305,26 +364,47 @@ export default {
 
 	/**
 	 * Get sum of data per index
+	 * @param {string} targetId Target ID to get total for (only for normalized stack per group)
 	 * @private
 	 * @returns {Array}
 	 */
-	getTotalPerIndex() {
+	getTotalPerIndex(targetId?: string) {
 		const $$ = this;
-		const cacheKey = KEY.dataTotalPerIndex;
+		const {config} = $$;
+		const cacheKey = targetId ? `${KEY.dataTotalPerIndex}-${targetId}` : KEY.dataTotalPerIndex;
 		let sum = $$.cache.get(cacheKey);
 
-		if ($$.isStackNormalized() && !sum) {
+		if (($$.config.data_groups.length || $$.isStackNormalized()) && !sum) {
 			sum = [];
 
-			$$.data.targets.forEach(row => {
+			// When normalize per group is enabled and targetId is provided,
+			// only sum data within the same group
+			let {targets} = $$.data;
+
+			if ($$.isStackNormalizedPerGroup() && targetId) {
+				// Find which group the target belongs to
+				const group = config.data_groups.find(g => g.indexOf(targetId) >= 0);
+
+				if (group) {
+					// Only sum targets in the same group
+					targets = targets.filter(t => group.indexOf(t.id) >= 0);
+				} else {
+					// If target is not in any group, return null to indicate no normalization
+					return null;
+				}
+			}
+
+			targets.forEach(row => {
 				row.values.forEach((v, i) => {
 					if (!sum[i]) {
 						sum[i] = 0;
 					}
 
-					sum[i] += isNumber(v.value) ? v.value : 0;
+					sum[i] += ~~v.value;
 				});
 			});
+
+			$$.cache.add(cacheKey, sum);
 		}
 
 		return sum;
@@ -342,11 +422,11 @@ export default {
 		let total = $$.cache.get(cacheKey);
 
 		if (!isNumber(total)) {
-			const sum = mergeArray($$.data.targets.map(t => t.values))
-				.map(v => v.value)
-				.reduce((p, c) => p + c);
+			total = $$.data.targets.reduce((acc, t) => {
+				return acc + t.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+			}, 0);
 
-			$$.cache.add(cacheKey, total = sum);
+			$$.cache.add(cacheKey, total);
 		}
 
 		if (subtractHidden) {
@@ -391,12 +471,13 @@ export default {
 	 * @private
 	 */
 	getMaxDataCount(): number {
-		return Math.max(...this.data.targets.map(t => t.values.length));
+		return Math.max(...this.data.targets.map(t => t.values.length), 0);
 	},
 
 	getMaxDataCountTarget() {
 		let target = this.filterTargetsToShow() || [];
 		const length = target.length;
+		const isInverted = this.config.axis_x_inverted;
 
 		if (length > 1) {
 			target = target.map(t => t.values)
@@ -404,9 +485,12 @@ export default {
 				.map(v => v.x);
 
 			target = sortValue(getUnique(target))
-				.map((x, index) => ({x, index}));
+				.map((x, index, array) => ({
+					x,
+					index: isInverted ? array.length - index - 1 : index
+				}));
 		} else if (length) {
-			target = target[0].values;
+			target = target[0].values.concat();
 		}
 
 		return target;
@@ -416,7 +500,7 @@ export default {
 		return targets.map(d => d.id);
 	},
 
-	mapToTargetIds(ids) {
+	mapToTargetIds(ids?: string[] | string): string[] {
 		const $$ = this;
 
 		return ids ? (isArray(ids) ? ids.concat() : [ids]) : $$.mapToIds($$.data.targets);
@@ -442,10 +526,36 @@ export default {
 		return this.state.hiddenLegendIds.indexOf(targetId) < 0;
 	},
 
-	filterTargetsToShow(targets) {
+	filterTargetsToShow(targets?) {
 		const $$ = this;
 
-		return (targets || $$.data.targets).filter(t => $$.isTargetToShow(t.id));
+		// When called without arguments, use caching
+		if (!targets) {
+			const {cache, data, state} = $$;
+			const cacheKey = KEY.filteredTargets;
+			const visibilityChecksum = state.hiddenTargetIds.join(",");
+			const storedChecksum = cache.get(KEY.visibilityChecksum);
+
+			// Invalidate cache if visibility changed
+			if (visibilityChecksum !== storedChecksum) {
+				cache.remove(cacheKey);
+				cache.add(KEY.visibilityChecksum, visibilityChecksum);
+			}
+
+			// Return cached result if available
+			if (cache.has(cacheKey)) {
+				return cache.get(cacheKey);
+			}
+
+			// Compute and cache result (store the filtered array)
+			const filtered = data.targets.filter(t => $$.isTargetToShow(t.id));
+			cache.add(cacheKey, filtered);
+
+			return filtered;
+		}
+
+		// When called with custom targets, don't cache
+		return targets.filter(t => $$.isTargetToShow(t.id));
 	},
 
 	mapTargetsToUniqueXs(targets) {
@@ -465,7 +575,7 @@ export default {
 	},
 
 	/**
-	 * Add to the state target Ids
+	 * Add to thetarget Ids
 	 * @param {string} type State's prop name
 	 * @param {Array|string} targetIds Target ids array
 	 * @private
@@ -518,8 +628,13 @@ export default {
 		const {hasAxis} = $$.state;
 		const ys = {};
 		const isMultipleX = $$.isMultipleX();
-		const xs = isMultipleX ? $$.mapTargetsToUniqueXs(targets)
-			.map(v => (isString(v) ? v : +v)) : null;
+		const xs = isMultipleX ?
+			$$.mapTargetsToUniqueXs(targets)
+				.map(v => (isString(v) ? v : +v)) :
+			null;
+
+		// Create xIndexMap for O(1) lookup instead of O(n) indexOf in getIndexByX
+		const xIndexMap = xs ? new Map(xs.map((x, i) => [x, i])) : null;
 
 		targets.forEach(t => {
 			const data: any[] = [];
@@ -531,7 +646,9 @@ export default {
 
 					// exclude 'volume' value to correct mis domain calculation
 					if (value !== null && $$.isCandlestickType(v)) {
-						value = isArray(value) ? value.slice(0, 4) : [value.open, value.high, value.low, value.close];
+						value = isArray(value) ?
+							value.slice(0, 4) :
+							[value.open, value.high, value.low, value.close];
 					}
 
 					if (isArray(value)) {
@@ -541,8 +658,14 @@ export default {
 					} else if ($$.isBubbleZType(v)) {
 						data.push(hasAxis && $$.getBubbleZData(value, "y"));
 					} else {
-						if (isMultipleX) {
-							data[$$.getIndexByX(v.x, xs)] = value;
+						if (isMultipleX && xIndexMap) {
+							// Use Map for O(1) lookup instead of getIndexByX which uses indexOf
+							const xKey = isString(v.x) ? v.x : +v.x;
+							const index = xIndexMap.get(xKey);
+
+							if (index !== undefined) {
+								data[index as number] = value;
+							}
 						} else {
 							data.push(value);
 						}
@@ -556,20 +679,8 @@ export default {
 	},
 
 	checkValueInTargets(targets, checker: Function): boolean {
-		const ids = Object.keys(targets);
-		let values;
-
-		for (let i = 0; i < ids.length; i++) {
-			values = targets[ids[i]].values;
-
-			for (let j = 0; j < values.length; j++) {
-				if (checker(values[j].value)) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return Object.keys(targets)
+			.some(id => targets[id].values.some(v => checker(v.value)));
 	},
 
 	hasMultiTargets(): boolean {
@@ -603,11 +714,11 @@ export default {
 
 	/**
 	 * Get data.order compare function
-	 * @param {boolean} isArc Is for Arc type sort or not
-	 * @returns {Function} compare function
+	 * @param {boolean} isReversed for Arc & Treemap type sort order needs to be reversed
+	 * @returns {function} compare function
 	 * @private
 	 */
-	getSortCompareFn(isArc = false): Function | null {
+	getSortCompareFn(isReversed = false): Function | null {
 		const $$ = this;
 		const {config} = $$;
 		const order = config.data_order;
@@ -617,12 +728,15 @@ export default {
 
 		if (orderAsc || orderDesc) {
 			const reducer = (p, c) => p + Math.abs(c.value);
+			const sum = v => (isNumber(v) ? v : (
+				"values" in v ? v.values.reduce(reducer, 0) : v.value
+			));
 
 			fn = (t1: IData | IDataRow, t2: IData | IDataRow) => {
-				const t1Sum = "values" in t1 ? t1.values.reduce(reducer, 0) : t1.value;
-				const t2Sum = "values" in t2 ? t2.values.reduce(reducer, 0) : t2.value;
+				const t1Sum = sum(t1);
+				const t2Sum = sum(t2);
 
-				return isArc ?
+				return isReversed ?
 					(orderAsc ? t1Sum - t2Sum : t2Sum - t1Sum) :
 					(orderAsc ? t2Sum - t1Sum : t1Sum - t2Sum);
 			};
@@ -635,6 +749,16 @@ export default {
 
 	filterByX(targets, x) {
 		return mergeArray(targets.map(t => t.values)).filter(v => v.x - x === 0);
+	},
+
+	filterNullish(data) {
+		const filter = v => isValue(v.value);
+
+		return data ?
+			data.filter(
+				v => "value" in v ? filter(v) : v.values.some(filter)
+			) :
+			data;
 	},
 
 	filterRemoveNull(data) {
@@ -652,49 +776,85 @@ export default {
 	hasDataLabel() {
 		const dataLabels = this.config.data_labels;
 
-		return (isboolean(dataLabels) && dataLabels) ||
+		return (isBoolean(dataLabels) && dataLabels) ||
 			(isObjectType(dataLabels) && notEmpty(dataLabels));
+	},
+
+	/**
+	 * Determine if has null value
+	 * @param {Array} targets Data array to be evaluated
+	 * @returns {boolean}
+	 * @private
+	 */
+	hasNullDataValue(targets: IDataRow[]): boolean {
+		return targets.some(({value}) => value === null);
 	},
 
 	/**
 	 * Get data index from the event coodinates
 	 * @param {Event} event Event object
 	 * @returns {number}
+	 * @private
 	 */
 	getDataIndexFromEvent(event): number {
 		const $$ = this;
-		const {config, state: {inputType, eventReceiver: {coords, rect}}} = $$;
-		const isRotated = config.axis_rotated;
+		const {
+			$el,
+			config,
+			state: {hasRadar, inputType, eventReceiver: {coords, rect}}
+		} = $$;
+		let index;
 
-		// get data based on the mouse coords
-		const e = inputType === "touch" && event.changedTouches ? event.changedTouches[0] : event;
-		const index = findIndex(
-			coords,
-			isRotated ? e.clientY - rect.top : e.clientX - rect.left,
-			0,
-			coords.length - 1,
-			isRotated
-		);
+		if (hasRadar) {
+			let target = event.target;
+
+			// in case of multilined axis text
+			if (/tspan/i.test(target.tagName)) {
+				target = target.parentNode;
+			}
+
+			const d: any = d3Select(target).datum();
+
+			index = d && Object.keys(d).length === 1 ? d.index : undefined;
+		} else {
+			const isRotated = config.axis_rotated;
+			const scrollPos = getScrollPosition($el.chart.node());
+
+			// get data based on the mouse coords
+			const e = inputType === "touch" && event.changedTouches ?
+				event.changedTouches[0] :
+				event;
+
+			let point = isRotated ? e.clientY + scrollPos.y : e.clientX + scrollPos.x;
+
+			if (hasViewBox($el.svg)) {
+				const pos = [point, 0];
+
+				isRotated && pos.reverse();
+				point = getTransformCTM($el.eventRect.node(), ...pos)[isRotated ? "y" : "x"];
+			} else {
+				point -= isRotated ? rect.top : rect.left;
+			}
+
+			index = findIndex(
+				coords,
+				point,
+				0,
+				coords.length - 1,
+				isRotated
+			);
+		}
 
 		return index;
 	},
 
-	getDataLabelLength(min, max, key) {
+	getDataLabelLength(min: number, max: number, key: "width" | "height"): number[] {
 		const $$ = this;
-		const lengths = [0, 0];
 		const paddingCoef = 1.3;
 
-		$$.$el.chart.select("svg").selectAll(".dummy")
-			.data([min, max])
-			.enter()
-			.append("text")
-			.text(d => $$.dataLabelFormat(d.id)(d))
-			.each(function(d, i) {
-				lengths[i] = this.getBoundingClientRect()[key] * paddingCoef;
-			})
-			.remove();
-
-		return lengths;
+		return $$.getTextRect(
+			[min, max].map(v => $$.dataLabelFormat()(v))
+		)?.map((rect: DOMRect) => rect[key] * paddingCoef) || [0, 0];
 	},
 
 	isNoneArc(d) {
@@ -729,7 +889,7 @@ export default {
 		return sames;
 	},
 
-	findClosestFromTargets(targets, pos): IDataRow | undefined {
+	findClosestFromTargets(targets, pos: [number, number]): IDataRow | undefined {
 		const $$ = this;
 		const candidates = targets.map(target => $$.findClosest(target.values, pos)); // map to array of closest points of each target
 
@@ -737,11 +897,12 @@ export default {
 		return $$.findClosest(candidates, pos);
 	},
 
-	findClosest(values, pos): IDataRow | undefined {
+	findClosest(values, pos: [number, number]): IDataRow | undefined {
 		const $$ = this;
-		const {config, $el: {main}} = $$;
+		const {$el: {main}} = $$;
 		const data = values.filter(v => v && isValue(v.value));
-		let minDist = config.point_sensitivity;
+
+		let minDist;
 		let closest;
 
 		// find mouseovering bar/candlestick
@@ -750,8 +911,12 @@ export default {
 			.filter(v => $$.isBarType(v.id) || $$.isCandlestickType(v.id))
 			.forEach(v => {
 				const selector = $$.isBarType(v.id) ?
-					`.${$BAR.chartBar}.${$COMMON.target}${$$.getTargetSelectorSuffix(v.id)} .${$BAR.bar}-${v.index}` :
-					`.${$CANDLESTICK.chartCandlestick}.${$COMMON.target}${$$.getTargetSelectorSuffix(v.id)} .${$CANDLESTICK.candlestick}-${v.index} path`;
+					`.${$BAR.chartBar}.${$COMMON.target}${
+						$$.getTargetSelectorSuffix(v.id)
+					} .${$BAR.bar}-${v.index}` :
+					`.${$CANDLESTICK.chartCandlestick}.${$COMMON.target}${
+						$$.getTargetSelectorSuffix(v.id)
+					} .${$CANDLESTICK.candlestick}-${v.index} path`;
 
 				if (!closest && $$.isWithinBar(main.select(selector).node())) {
 					closest = v;
@@ -761,8 +926,10 @@ export default {
 		// find closest point from non-bar/candlestick
 		data
 			.filter(v => !$$.isBarType(v.id) && !$$.isCandlestickType(v.id))
-			.forEach(v => {
+			.forEach((v: IDataPoint) => {
 				const d = $$.dist(v, pos);
+
+				minDist = $$.getPointSensitivity(v);
 
 				if (d < minDist) {
 					minDist = d;
@@ -773,11 +940,11 @@ export default {
 		return closest;
 	},
 
-	dist(data, pos) {
+	dist(data: IDataPoint, pos: [number, number]) {
 		const $$ = this;
 		const {config: {axis_rotated: isRotated}, scale} = $$;
-		const xIndex = isRotated ? 1 : 0;
-		const yIndex = isRotated ? 0 : 1;
+		const xIndex = +isRotated; // true: 1, false: 0
+		const yIndex = +!isRotated; // true: 0, false: 1
 		const y = $$.circleY(data, data.index);
 		const x = (scale.zoom || scale.x)(data.x);
 
@@ -795,31 +962,34 @@ export default {
 		const {axis, config} = $$;
 		const stepType = config.line_step_type;
 		const isCategorized = axis ? axis.isCategorized() : false;
-
 		const converted = isArray(values) ? values.concat() : [values];
 
 		if (!(isCategorized || /step\-(after|before)/.test(stepType))) {
 			return values;
 		}
 
-		// insert & append cloning first/last value to be fully rendered covering on each gap sides
-		const head = converted[0];
-		const tail = converted[converted.length - 1];
-		const {id} = head;
-		let {x} = head;
+		// when all data are null, return empty array
+		// https://github.com/naver/billboard.js/issues/3124
+		if (converted.length) {
+			// insert & append cloning first/last value to be fully rendered covering on each gap sides
+			const head = converted[0];
+			const tail = converted[converted.length - 1];
+			const {id} = head;
+			let {x} = head;
 
-		// insert head
-		converted.unshift({x: --x, value: head.value, id});
-
-		isCategorized && stepType === "step-after" &&
+			// insert head
 			converted.unshift({x: --x, value: head.value, id});
 
-		// append tail
-		x = tail.x;
-		converted.push({x: ++x, value: tail.value, id});
+			isCategorized && stepType === "step-after" &&
+				converted.unshift({x: x - 1, value: head.value, id});
 
-		isCategorized && stepType === "step-before" &&
+			// append tail
+			x = tail.x;
 			converted.push({x: ++x, value: tail.value, id});
+
+			isCategorized && stepType === "step-before" &&
+				converted.push({x: x + 1, value: tail.value, id});
+		}
 
 		return converted;
 	},
@@ -869,18 +1039,41 @@ export default {
 		const value = d?.value;
 
 		if (isArray(value)) {
-			// @ts-ignore
-			const index = {
-				areaRange: ["high", "mid", "low"],
-				candlestick: ["open", "high", "low", "close", "volume"]
-			}[type].indexOf(key);
+			if (type === "bar") {
+				return value.reduce((a, c) => c - a);
+			} else {
+				// @ts-ignore
+				const index = {
+					areaRange: ["high", "mid", "low"],
+					candlestick: ["open", "high", "low", "close", "volume"]
+				}[type].indexOf(key);
 
-			return index >= 0 && value ? value[index] : undefined;
-		} else if (value) {
+				return index >= 0 && value ? value[index] : undefined;
+			}
+		} else if (value && key) {
 			return value[key];
 		}
 
 		return value;
+	},
+
+	/**
+	 * Set ratio for grouped data
+	 * @param {Array} data Data array
+	 * @private
+	 */
+	setRatioForGroupedData(data: (IDataRow | IData)[]): void {
+		const $$ = this;
+		const {config} = $$;
+
+		// calculate ratio if grouped data exists
+		if (config.data_groups.length && data.some(d => $$.isGrouped(d.id))) {
+			const setter = (d: IDataRow) => $$.getRatio("index", d, true);
+
+			data.forEach(v => {
+				"values" in v ? v.values.forEach(setter) : setter(v);
+			});
+		}
 	},
 
 	/**
@@ -891,7 +1084,7 @@ export default {
 	 * @returns {number} Ratio value
 	 * @private
 	 */
-	getRatio(type: string, d, asPercent = false): number {
+	getRatio(type: "arc" | "index" | "radar" | "bar" | "treemap", d, asPercent = false): number {
 		const $$ = this;
 		const {config, state} = $$;
 		const api = $$.api;
@@ -907,28 +1100,54 @@ export default {
 
 					// otherwise, based on the rendered angle value
 				} else {
-					const gaugeArcLength = config.gauge_fullCircle ? $$.getArcLength() : $$.getStartAngle() * -2;
+					const gaugeArcLength = config.gauge_fullCircle ?
+						$$.getArcLength() :
+						$$.getStartingAngle() * -2;
 					const arcLength = $$.hasType("gauge") ? gaugeArcLength : Math.PI * 2;
 
 					ratio = (d.endAngle - d.startAngle) / arcLength;
 				}
 			} else if (type === "index") {
 				const dataValues = api.data.values.bind(api);
-				let total = this.getTotalPerIndex();
+				const {hiddenTargetIds} = state;
 
-				if (state.hiddenTargetIds.length) {
-					let hiddenSum = dataValues(state.hiddenTargetIds, false);
+				// For normalized stack per group, get total per group
+				let total = this.getTotalPerIndex(
+					$$.isStackNormalizedPerGroup() ? d.id : undefined
+				);
 
-					if (hiddenSum.length) {
-						hiddenSum = hiddenSum
-							.reduce((acc, curr) => acc.map((v, i) => (isNumber(v) ? v : 0) + curr[i]));
+				// If total is null, the data is not in any group - don't normalize
+				if (total === null) {
+					return ratio;
+				}
 
-						total = total.map((v, i) => v - hiddenSum[i]);
+				if (hiddenTargetIds.length) {
+					// When normalized per group, only subtract hidden data from the same group
+					let hiddenIds = hiddenTargetIds;
+
+					if ($$.isStackNormalizedPerGroup() && d.id) {
+						const group = config.data_groups.find(g => g.indexOf(d.id) >= 0);
+						if (group) {
+							// Only consider hidden IDs in the same group
+							hiddenIds = hiddenIds.filter(id => group.indexOf(id) >= 0);
+						}
+					}
+
+					if (hiddenIds.length) {
+						let hiddenSum = dataValues(hiddenIds, false);
+
+						if (hiddenSum.length) {
+							hiddenSum = hiddenSum
+								.reduce((acc, curr) => acc.map((v, i) => ~~v + curr[i]));
+
+							total = total.map((v, i) => v - hiddenSum[i]);
+						}
 					}
 				}
 
-				d.ratio = isNumber(d.value) && total && total[d.index] > 0 ?
-					d.value / total[d.index] : 0;
+				const divisor = total[d.index];
+
+				d.ratio = isNumber(d.value) && total && divisor ? d.value / divisor : 0;
 
 				ratio = d.ratio;
 			} else if (type === "radar") {
@@ -940,7 +1159,11 @@ export default {
 				const max = yScale.domain().reduce((a, c) => c - a);
 
 				// when all data are 0, return 0
-				ratio = max === 0 ? 0 : Math.abs(d.value) / max;
+				ratio = max === 0 ? 0 : Math.abs(
+					$$.getRangedData(d, null, type) / max
+				);
+			} else if (type === "treemap") {
+				ratio /= $$.getTotalDataSum(true);
 			}
 		}
 
@@ -983,7 +1206,7 @@ export default {
 
 		return $$.isBubbleType(d) && (
 			(isObject(d.value) && ("z" in d.value || "y" in d.value)) ||
-			(isArray(d.value) && d.value.length === 2)
+			(isArray(d.value) && d.value.length >= 2)
 		);
 	},
 
@@ -997,7 +1220,8 @@ export default {
 		const $$ = this;
 		const {value} = d;
 
-		return $$.isBarType(d) && isArray(value) && value.length === 2 && value.every(v => isNumber(v));
+		return $$.isBarType(d) && isArray(value) && value.length >= 2 &&
+			value.every(isNumber);
 	},
 
 	/**

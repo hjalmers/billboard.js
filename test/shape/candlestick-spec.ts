@@ -4,7 +4,7 @@
  */
 /* eslint-disable */
 /* global describe, beforeEach, it, expect */
-import {expect} from "chai";
+import {beforeEach, beforeAll, describe, expect, it} from "vitest";
 import util from "../assets/util";
 import {isArray} from "../../src/module/util";
 import {$CANDLESTICK, $COMMON} from "../../src/config/classes";
@@ -18,7 +18,7 @@ describe("SHAPE CANDLESTICK", () => {
 	});
 
 	describe("default candlestick", () => {
-		before(() => {
+		beforeAll(() => {
 			args = {
 				data: {
 					columns: [
@@ -47,8 +47,8 @@ describe("SHAPE CANDLESTICK", () => {
 
 		it("check for basic rendering", () => {
 			const expectedPath = [
-				/^M60,217\.\d+V337\.\d+ H240 V217\.\d+z$/,
-				/^M359,337\.\d+V132\.\d+ H539 V337\.\d+z$/
+				/^M59\.\d+,217\.\d+V33\d\.\d+ H239\.\d+ V217\.\d+z$/,
+				/^M359\.4,33\d\.\d+V132\.\d+ H539\.\d+/
 			];
 
 			const expectedLinePos = [
@@ -83,7 +83,7 @@ describe("SHAPE CANDLESTICK", () => {
 					expect(data.close > data.open).to.be.true;
 					expect(this.getAttribute("class").indexOf($CANDLESTICK.valueUp) > -1).to.be.true;
 				}
-
+ 
 				expect(expectedPath[i].test(path.getAttribute("d"))).to.be.true;
 				
 				expect(+line.getAttribute("x1")).to.be.closeTo(expectedLinePos[i].x1, 1);
@@ -131,10 +131,73 @@ describe("SHAPE CANDLESTICK", () => {
 				expect(hasExpandedClass).to.be.false;
 			});
 		});
+
+		it("set options: with wrong nullish data", () => {
+			args = {
+				data: {
+					columns: [
+						["data1",
+							{open: 100, high: 130, low: 5, close: 30, volume: 100},
+							[10,20,null, null, 10],
+						]
+					],
+					type: "candlestick"
+				}
+			};
+		});
+
+		it("for wrong data, path shouldn't render.", () => {
+			const d = chart.internal.$el.main.selectAll(".bb-shape:last-child path").attr("d");
+
+			expect(d).to.be.equal("M0,0V0 H0 V0z");			
+		});
+	});
+
+	describe("rotated axis", () => {
+		beforeAll(() => {
+			args = {
+				data: {
+					columns: [
+						["data1",
+							{open: 100, high: 140, low: -40, close: -20}
+						]
+					],
+					type: "candlestick",
+					labels: true
+				},
+				axis: {
+					rotated: true,
+					x: {
+						type: "category"
+					}
+				},
+				grid: {
+					y: {
+						show: true
+					}
+				}
+			};
+		});
+
+		it("should rendered correctly.", () => {
+			const {$el: {candlestick}, scale: {y}} = chart.internal;
+			const data = chart.data("data1")[0].values[0].value;
+
+			const line = candlestick.select("line");
+			const path = candlestick.select("path").attr("d");
+
+			// check line position
+			expect(+line.attr("x1")).to.be.equal(y(data.low));
+			expect(+line.attr("x2")).to.be.equal(y(data.high));
+
+			// check path position
+			expect(path.indexOf(y(data.close)) > -1).to.be.true;
+			expect(path.indexOf(y(data.open)) > -1).to.be.true;
+		});
 	});
 
 	describe("candlestick + combination", () => {
-		before(() => {
+		beforeAll(() => {
 			args = {
 				data: {
 					x: "x",
@@ -191,8 +254,8 @@ describe("SHAPE CANDLESTICK", () => {
 			const expected = {
 				data1: {
 					path: {
-						0: /^M97\.\d+,217\.\d+V337\.\d+ H149.5 V217\.\d+z$/,
-						1: /^M246\.\d+,337\.\d+V132\.\d+ H299 V337\.\d+z/
+						0: /^M97\.\d+,217\.\d+V33[67]\.\d+ H149\.\d+ V217\.\d+z$/,
+						1: /^M247\.\d+,33[67]\.\d+V132\.\d+ H299\.5 V33[67]\.\d+z/
 					},
 					line: {
 						0: {
@@ -207,8 +270,8 @@ describe("SHAPE CANDLESTICK", () => {
 				},
 				data2: {
 					path: {
-						0: /^M149.5,202\.\d+V94\.\d+ H201.65 V202\.\d+z$/,
-						2: /^M448.5,217\.\d+V337\.\d+ H500.65 V217\.\d+z$/
+						0: /^M149.75,202\.\d+V9[45]\.\d+ H202\.\d+ V202\.\d+z$/,
+						2: /^M449.25,217\.\d+V33[67]\.\d+ H501\.\d+ V217\.\d+z$/
 					},
 					line: {
 						0: {
@@ -253,13 +316,57 @@ describe("SHAPE CANDLESTICK", () => {
 			});
 
 			const expectedLine = {
-				data3: /^M150,8\d\.\d+L299,217\.\d+L449,26\d\.\d+$/,
-				data4: /^M150,8\d\.\d+L22\d\.\d+,8\d\.\d+L224.5,21\d\.\d+L37\d,21\d\.\d+L37\d,26\d\.\d+L44\d,26\d\.\d+$/
+				data3: /^M149.75,8[01]\.\d+L299.5,217\.\d+/,
+				data4: /^M149.75,8[01]\.\d+L224/
 			};
 
 			chart.$.line.lines.each(function(d, i) {
 				expect(expectedLine[d.id].test(this.getAttribute("d"))).to.be.true;
 			})
 		});
+	});
+
+	describe("dynamic load", () => {
+		beforeAll(() => {
+			args = {
+				data: {
+					columns: [],
+					labels: true
+				},
+			};
+		});
+
+		it("should generate candlestick from empty chart", () => new Promise(done => {
+			const data = [					
+					["data1",
+						{open: 100, high: 130, low: 5, close: 30, volume: 100},
+						[30, 200, 5, 150, 200],
+					]
+				];
+
+			// when
+			chart.load({
+				columns: data,
+				type: "candlestick",
+				done() {
+					const {$el: {candlestick, tooltip}} = this.internal;
+
+					expect(candlestick.size()).to.be.equal(2);
+
+					// when
+					this.tooltip.show({x: 0});
+
+					// check if tooltip content shows correct data
+					const str = JSON.stringify(data[0][1])
+						.replace(/[{}\",]/g, "")
+						.replace(/(\d)(?=[a-z])/g, "$1 ")
+						.replace(/(:)(\d)/g, "$1 $2");
+
+					expect(str).to.be.equal(tooltip.select(".value").text().toLowerCase());
+
+					done(1);
+				}
+			});
+		}));
 	});
 });

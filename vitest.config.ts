@@ -1,0 +1,75 @@
+import {resolve} from "node:path";
+import {defineConfig} from "vitest/config";
+import { playwright } from "@vitest/browser-playwright";
+
+export default defineConfig({
+    optimizeDeps: {
+        include: ["@vitest/coverage-istanbul"]
+    },
+    css: {
+        preprocessorOptions: {
+            scss: {
+                silenceDeprecations: ["legacy-js-api"]
+            }        
+        }
+    },
+    test: {
+        testTimeout: 3_500,
+        hookTimeout: 5_000,
+        globals: true,
+        coverage: {
+            provider: "istanbul",
+            reporter: ["text-summary", "html", "lcovonly"],
+            enabled: true,
+            include: [
+                `src/**/**.{ts, tsx}`,
+            ]
+        },
+        include: [
+            "test/**/*-spec.ts"
+        ],
+        exclude: [
+            "src/**/**",
+            "demo/**/**",
+            "config/**/**",
+            "packages/**/**",
+        ],
+        setupFiles: [
+            "test/assets/common.css",
+            "src/scss/billboard.scss"
+        ],
+        pool: "threads",
+        browser: {
+            enabled: true,
+            provider:  playwright(),
+            headless: true,
+            viewport: {
+                width: 800,
+                height: 600
+            },
+            instances: [
+                {
+                    browser: "chromium"
+                }
+            ],
+            screenshotFailures: false
+        },
+        alias: [
+            {
+                find: /(.*)\/module\/util/i,
+                replacement: "./test/assets/module/util",
+                customResolver(source, importer, options) {
+                    if (/src/.test(<string>importer)) {
+                        return resolve(__dirname, source + ".ts");
+                    }
+                },
+            }
+        ],
+        css: {
+            include: [
+                /.+/
+            ]
+        },
+        open: true
+    }
+});

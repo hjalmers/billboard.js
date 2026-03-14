@@ -3,7 +3,7 @@
  * billboard.js project is licensed under the MIT license
  */
 /* eslint-disable */
-import {expect} from "chai";
+import {beforeAll, afterAll, describe, expect, it} from "vitest";
 import {select as d3Select} from "d3-selection";
 import util from "../assets/util";
 import {$AXIS} from "../../src/config/classes";
@@ -11,10 +11,10 @@ import {$AXIS} from "../../src/config/classes";
 describe("API axis", function() {
 	let chart;
 	let main;
-	const rx = /translate\((\d+),.*/;
+	const rx = /translate\(([^,]*),.*/;
 
-	before(() => {
-		return new Promise((resolve) => {
+	beforeAll(() => {
+		return new Promise(resolve => {
 			chart = util.generate({
 				data: {
 					columns: [
@@ -37,16 +37,19 @@ describe("API axis", function() {
 						label: "Y2 Axis Label"
 					}
 				},
+				transition: {
+					duration: 0
+				},
 				onrendered: function() {
 					main = this.internal.$el.main;
-					resolve(true);
+					resolve(1);
 				}
 			});
 		});
-	});
+	}, 1500);
 
 	describe("axis.labels()", () => {
-		it("should update y axis label", done => {
+		it("should update y axis label", () => new Promise(done => {
 			const axisLabel = {
 				y: "New Y Axis Label"
 			};
@@ -66,11 +69,11 @@ describe("API axis", function() {
 					y2: "Y2 Axis Label"
 				});
 
-				done();
-			}, 500);
-		});
+				done(1);
+			}, 350);
+		}));
 
-		it("should update y axis label", done => {
+		it("should update y axis label", () => new Promise(done => {
 			// when
 			chart.axis.labels({
 				y2: "New Y2 Axis Label"
@@ -83,9 +86,9 @@ describe("API axis", function() {
 				expect(label.attr("dx")).to.be.equal("-0.5em");
 				expect(label.attr("dy")).to.be.equal("-0.5em");
 
-				done();
-			}, 500);
-		});
+				done(1);
+			}, 350);
+		}));
 
 		it("should return axis labels", () => {
 			expect(chart.axis.labels()).to.be.deep.equal({
@@ -96,13 +99,14 @@ describe("API axis", function() {
 	});
 
 	describe("axis.min/max()", () => {
-		it("should update axis min value", done => {
+		it("should update axis min value", () => new Promise(done => {
 			const xAxisTick = main.select(`.${$AXIS.axisX} .tick`).node();
 			const xTickValue = +xAxisTick.getAttribute("transform").replace(rx, "$1");
 			const x = -1;
 			const y = 0;
 			const y2 = 5;
 
+			// when
 			chart.axis.min({
 				x,
 				y,
@@ -111,7 +115,7 @@ describe("API axis", function() {
 
 			setTimeout(() => {
 				let tspan;
-
+				
 				// check for x max value
 				expect(xTickValue).to.be.below(+xAxisTick.getAttribute("transform").replace(rx, "$1"));
 
@@ -128,11 +132,11 @@ describe("API axis", function() {
 
 				expect(tspan.empty()).to.be.false;
 
-				done();
-			}, 500);
-		});
+				done(1);
+			}, 350);
+		}));
 
-		it("should update axis max value", done => {
+		it("should update axis max value", () => new Promise(done => {
 			const xAxisTick = main.selectAll(`.${$AXIS.axisX} .tick`).nodes();
 			const lastIndex = xAxisTick.length - 1;
 
@@ -141,6 +145,7 @@ describe("API axis", function() {
 			const y = 300;
 			const y2 = 100;
 
+			// when
 			chart.axis.max({
 				x,
 				y,
@@ -161,13 +166,87 @@ describe("API axis", function() {
 				tspan = main.selectAll(`.${$AXIS.axisY2} tspan`).nodes();
 				expect(+tspan[tspan.length - 1].innerHTML).to.be.equal(y2);
 
-				done();
-			}, 500);
+				done(1);
+			}, 350);
+		}));
+
+		it("axis.min(): check unset & shorthand", () => {
+			const current = chart.axis.min();
+
+			afterAll(() => {
+				chart.axis?.min?.(current);
+			})
+
+			// when
+			chart.axis.min({
+				y: false
+			});
+
+			const min = chart.axis.min();
+
+			Object.keys(min).forEach(key => {
+				if (key === "y") {
+					expect(min[key]).to.be.undefined;
+				} else {
+					expect(typeof min[key] === "number").to.be.true;
+				}
+			});
+
+			// when - shorthand
+			chart.axis.min(-100);
+
+			expect(chart.axis.min()).to.be.deep.equal({
+				x: -1, y: -100, y2: -100
+			});
+
+			// when - shorthand
+			chart.axis.min(false);
+
+			expect(chart.axis.min()).to.be.deep.equal({
+				x: -1, y: undefined, y2: undefined
+			});
+		});
+
+		it("axis.max(): check unset & shorthand", () => {
+			const current = chart.axis.max();
+
+			afterAll(() => {
+				chart.axis?.max?.(current);
+			})
+
+			// when
+			chart.axis.max({
+				y2: false
+			});
+
+			const max = chart.axis.max();
+
+			Object.keys(max).forEach(key => {
+				if (key === "y2") {
+					expect(max[key]).to.be.undefined;
+				} else {
+					expect(typeof max[key] === "number").to.be.true;
+				}
+			});
+
+			// when - shorthand
+			chart.axis.max(1000);
+
+			expect(chart.axis.max()).to.be.deep.equal({
+				x: 10, y: 1000, y2: 1000
+			});
+
+			// when - shorthand
+			chart.axis.max(false);
+
+			expect(chart.axis.max()).to.be.deep.equal({
+				x: 10, y: undefined, y2: undefined
+			});
 		});
 	});
 
 	describe("axis.range()", () => {
-		it("should update axis min/max value", done => {
+		it("should update axis min/max value", () => new Promise(done => {
 			const xAxisTick = main.selectAll(`.${$AXIS.axisX} .tick`).nodes();
 			const xTickValueMin = +xAxisTick[0].getAttribute("transform").replace(rx, "$1");
 			const xTickValueMax = +xAxisTick[xAxisTick.length - 1].getAttribute("transform").replace(rx, "$1");
@@ -221,8 +300,53 @@ describe("API axis", function() {
 
 				expect(tspan.size()).to.be.equal(2);
 
-				done();
-			}, 500);
+				done(1);
+			}, 350);
+		}));
+
+		it("axis.range(): check unset & shorthand", () => {
+			const current = chart.axis.range();
+
+			afterAll(() => {
+				chart.axis?.range?.(current);
+			});
+
+			// when
+			chart.axis.range({
+				min: {
+					y: false
+				},
+				max: {
+					y2: false
+				}
+			});
+
+			const range = chart.axis.range();
+
+			expect(range.min.y).to.be.undefined;
+			expect(range.max.y2).to.be.undefined;
+
+			// when - shorthand
+			chart.axis.range({
+				min: -100,
+				max: 15000
+			});
+
+			expect(chart.axis.range()).to.deep.equal({
+				min: {x: -10, y: -100, y2: -100},
+				max: {x: 100, y: 15000, y2: 15000}
+			});
+
+			// when - shorthand
+			chart.axis.range({
+				min: false,
+				max: false
+			});
+
+			expect(chart.axis.range()).to.deep.equal({
+				min: {x: -10, y: undefined, y2: undefined},
+				max: {x: 100, y: undefined, y2: undefined}
+			});
 		});
 	});
 });

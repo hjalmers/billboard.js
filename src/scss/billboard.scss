@@ -20,10 +20,14 @@
 .bb-legend-item-tile,
 .bb-xgrid-focus,
 .bb-ygrid-focus,
-.bb-ygrid,
-.bb-event-rect,
-.bb-bars path {
+.bb-ygrid {
 	shape-rendering: crispEdges;
+}
+
+.bb-chart-arcs {
+	.bb-needle {
+		fill: #000;
+	}
 }
 
 .bb-chart-arc {
@@ -44,11 +48,44 @@
 		fill: #fff;
 		font-size: 13px;
 	}
+
+	/* Connector line base styles */
+	.bb-arc-label-line {
+		fill: none;
+		stroke-width: 1px;
+		pointer-events: none;
+	}
+
+	.bb-arc-label-line {
+		stroke: #7f7f7f;
+	}
+
+	> text.bb-arc-label-line-text {
+		fill: #000;
+	}
+}
+
+/*-- Funnel --*/
+.bb-chart-funnels {
+	path {
+		stroke-width: 0;
+	}
+
+	+ .bb-chart-texts text {
+		font-size: 13px;
+		fill: #fff;
+	}
 }
 
 /*-- Axis --*/
 .bb-axis {
 	shape-rendering: crispEdges;
+
+	.bb-axis-x-tooltip, .bb-axis-y-tooltip, .bb-axis-y2-tooltip {
+		font-size: 1em;
+		fill: #fff;
+		white-space: nowrap;
+	}
 }
 
 /*-- Grid --*/
@@ -133,7 +170,10 @@
 /*-- Region --*/
 .bb-region {
 	fill: steelblue;
-	fill-opacity: .1;
+
+	rect {
+		fill-opacity: .1;
+	}
 }
 
 /*-- Zoom region --*/
@@ -168,10 +208,17 @@
 	font: 14px sans-serif;
 }
 
+/*-- Treemap --*/
+.bb-chart-treemaps rect {
+    stroke: #fff;
+    stroke-width: 1px;
+}
+
 /*-- Tooltip --*/
 .bb-tooltip-container {
 	z-index: 10;
 	user-select: none;
+	transform: translateZ(0);
 }
 
 .bb-tooltip {
@@ -180,9 +227,8 @@
 	background-color:#fff;
 	empty-cells:show;
 	opacity: 0.9;
-	-webkit-box-shadow: 7px 7px 12px -9px rgb(119,119,119);
-	-moz-box-shadow: 7px 7px 12px -9px rgb(119,119,119);
 	box-shadow: 7px 7px 12px -9px rgb(119,119,119);
+	white-space: nowrap;
 
 	tr {
 		border:1px solid #CCC;
@@ -249,6 +295,19 @@ text.bb-chart-arcs-gauge-title {
 
 	.bb-chart-arcs-gauge-min {
 		fill: #777;
+	}
+
+	/*-- Polar --*/
+	.bb-levels {
+		circle {
+			fill: none;
+			stroke: #848282;
+			stroke-width: .5px;
+		}
+
+		text {
+			fill: #848282;
+		}
 	}
 }
 

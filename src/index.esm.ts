@@ -9,24 +9,24 @@ export {
 	areaSpline,
 	areaSplineRange,
 	areaStep,
+	areaStepRange,
 	bar,
 	bubble,
 	candlestick,
 	donut,
+	funnel,
 	gauge,
 	line,
 	pie,
+	polar,
 	radar,
 	scatter,
 	spline,
-	step
+	step,
+	treemap
 } from "./config/resolver/shape";
 
 // interaction module
-export {
-	selection,
-	subchart,
-	zoom
-} from "./config/resolver/interaction";
+export {selection, subchart, zoom} from "./config/resolver/interaction";
 
-export {default, bb} from "./core";
+export {bb, default} from "./core";

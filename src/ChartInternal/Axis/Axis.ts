@@ -3,15 +3,30 @@
  * billboard.js project is licensed under the MIT license
  */
 import {
-	axisTop as d3AxisTop,
 	axisBottom as d3AxisBottom,
 	axisLeft as d3AxisLeft,
-	axisRight as d3AxisRight
+	axisRight as d3AxisRight,
+	axisTop as d3AxisTop
 } from "d3-axis";
-import AxisRenderer from "./AxisRenderer";
+import type {AxisType} from "../../../types/types";
+import {$AXIS, $COMMON} from "../../config/classes";
+import {
+	capitalize,
+	getBoundingRect,
+	isArray,
+	isEmpty,
+	isFunction,
+	isNumber,
+	isObjectType,
+	isString,
+	isValue,
+	mergeObj,
+	notEmpty,
+	parseDate,
+	sortValue
+} from "../../module/util";
 import {getScale} from "../internals/scale";
-import {$AXIS} from "../../config/classes";
-import {capitalize, isArray, isFunction, isString, isValue, isEmpty, isNumber, isObjectType, mergeObj, notEmpty, parseDate, sortValue} from "../../module/util";
+import AxisRenderer from "./AxisRenderer";
 
 export default {
 	getAxisInstance: function() {
@@ -29,7 +44,9 @@ class Axis {
 
 	private axesList = {};
 	public tick = {
-		x: null, y: null, y2: null
+		x: null,
+		y: null,
+		y2: null
 	};
 	public xs = [];
 	private orient = {
@@ -90,17 +107,38 @@ class Axis {
 		return type;
 	}
 
+	/**
+	 * Get extent value
+	 * @returns {Array} default extent
+	 * @private
+	 */
+	public getExtent(): number[] {
+		const $$ = this.owner;
+		const {config, scale} = $$;
+		let extent = config.axis_x_extent;
+
+		if (extent) {
+			if (isFunction(extent)) {
+				extent = extent.bind($$.api)($$.getXDomain($$.data.targets), scale.subX);
+			} else if (this.isTimeSeries() && extent.every(isNaN)) {
+				const fn = parseDate.bind($$);
+
+				extent = extent.map(v => scale.subX(fn(v)));
+			}
+		}
+
+		return extent;
+	}
+
 	init() {
 		const $$ = this.owner;
 		const {config, $el: {main, axis}, state: {clip}} = $$;
-		const isRotated = config.axis_rotated;
 		const target = ["x", "y"];
 
 		config.axis_y2_show && target.push("y2");
 
 		target.forEach(v => {
 			const classAxis = this.getAxisClassName(v);
-			const classLabel = $AXIS[`axis${v.toUpperCase()}Label`];
 
 			axis[v] = main.append("g")
 				.attr("class", classAxis)
@@ -109,7 +147,7 @@ class Axis {
 
 					if (v === "x") {
 						res = clip.pathXAxis;
-					} else if (v === "y") { // && config.axis_y_inner) {
+					} else if (v === "y") { // || v === "y2") {
 						res = clip.pathYAxis;
 					}
 
@@ -117,13 +155,6 @@ class Axis {
 				})
 				.attr("transform", $$.getTranslate(v))
 				.style("visibility", config[`axis_${v}_show`] ? null : "hidden");
-
-			axis[v].append("text")
-				.attr("class", classLabel)
-				.attr("transform", ["rotate(-90)", null][
-					v === "x" ? +!isRotated : +isRotated
-				])
-				.style("text-anchor", () => this.textAnchorForAxisLabel(v));
 
 			this.generateAxes(v);
 		});
@@ -181,7 +212,9 @@ class Axis {
 				axes.push(
 					d3Axis(scale)
 						.ticks(tick.count)
-						.tickFormat(isFunction(tick.format) ? tick.format.bind($$.api) : ((x: any) => x))
+						.tickFormat(
+							isFunction(tick.format) ? tick.format.bind($$.api) : ((x: any) => x)
+						)
 						.tickValues(tick.values)
 						.tickSizeOuter(tick.outer === false ? 0 : 6)
 				);
@@ -253,14 +286,15 @@ class Axis {
 			id,
 			scale,
 			outerTick,
-
 			// do not transit x Axis on zoom and resizing
 			// https://github.com/naver/billboard.js/issues/1949
-			id === "x" && ($$.scale.zoom || $$.config.subchart_show || $$.state.resizing) ? true : noTransition
+			id === "x" && ($$.scale.zoom || $$.config.subchart_show || $$.state.resizing) ?
+				true :
+				noTransition
 		);
 	}
 
-	// called from : getMaxTickWidth()
+	// called from : getMaxTickSize()
 	getAxis(id, scale, outerTick, noTransition, noTickTextRotate): AxisRenderer {
 		const $$ = this.owner;
 		const {config} = $$;
@@ -292,6 +326,7 @@ class Axis {
 			owner: $$
 		}, isX && {
 			isCategory,
+			isInverted: config.axis_x_inverted,
 			tickMultiline: config.axis_x_tick_multiline,
 			tickWidth: config.axis_x_tick_width,
 			tickTitle: isCategory && config.axis_x_tick_tooltip && $$.api.categories(),
@@ -321,7 +356,7 @@ class Axis {
 		// Set tick
 		axis.tickFormat(
 			tickFormat || (
-				!isX && ($$.isStackNormalized() && (x => `${x}%`))
+				!isX && ($$.isStackNormalized() && $$.hasAxisGroupedData(id) && (x => `${x}%`))
 			)
 		);
 
@@ -384,7 +419,7 @@ class Axis {
 		return axis;
 	}
 
-	getXAxisTickFormat(forSubchart? : boolean): Function {
+	getXAxisTickFormat(forSubchart?: boolean): Function {
 		const $$ = this.owner;
 		const {config, format} = $$;
 		// enable different tick format for x and subX - subX format defaults to x format if not defined
@@ -403,15 +438,13 @@ class Axis {
 			}
 		} else {
 			currFormat = isTimeSeries ? format.defaultAxisTime : (
-				isCategorized ?
-					$$.categoryName : v => (v < 0 ? v.toFixed(0) : v)
+				isCategorized ? $$.categoryName : v => (v < 0 ? v.toFixed(0) : v)
 			);
 		}
 
-		return isFunction(currFormat) ? v =>
-			currFormat.apply($$, isCategorized ?
-				[v, $$.categoryName(v)] : [v]
-			) : currFormat;
+		return isFunction(currFormat) ?
+			v => currFormat.apply($$, isCategorized ? [v, $$.categoryName(v)] : [v]) :
+			currFormat;
 	}
 
 	getTickValues(id: string) {
@@ -451,7 +484,8 @@ class Axis {
 		const isRotated = this.owner.config.axis_rotated;
 		const option = this.getLabelOptionByAxisId(id);
 		const position = (isObjectType(option) && option.position) ?
-			option.position : defaultPosition[+!isRotated];
+			option.position :
+			defaultPosition[+!isRotated];
 
 		const has = v => !!~position.indexOf(v);
 
@@ -468,7 +502,8 @@ class Axis {
 	}
 
 	getAxisLabelPosition(id: string) {
-		return this.getLabelPosition(id, id === "x" ? ["inner-top", "inner-right"] : ["inner-right", "inner-top"]);
+		return this.getLabelPosition(id,
+			id === "x" ? ["inner-top", "inner-right"] : ["inner-right", "inner-top"]);
 	}
 
 	getLabelPositionById(id: string) {
@@ -492,22 +527,6 @@ class Axis {
 		return x;
 	}
 
-	dxForAxisLabel(id: string) {
-		const $$ = this.owner;
-		const position = this.getAxisLabelPosition(id);
-		let dx = position.isBottom ? "0.5em" : "0";
-
-		if (this.isHorizontal($$, id !== "x")) {
-			dx = position.isLeft ? "0.5em" : (
-				position.isRight ? "-0.5em" : "0"
-			);
-		} else if (position.isTop) {
-			dx = "-0.5em";
-		}
-
-		return dx;
-	}
-
 	textAnchorForAxisLabel(id: string) {
 		const $$ = this.owner;
 		const position = this.getAxisLabelPosition(id);
@@ -524,13 +543,29 @@ class Axis {
 		return anchor;
 	}
 
-	dyForAxisLabel(id: string) {
+	dxForAxisLabel(id: string) {
+		const $$ = this.owner;
+		const position = this.getAxisLabelPosition(id);
+		let dx = position.isBottom ? "0.5em" : "0";
+
+		if (this.isHorizontal($$, id !== "x")) {
+			dx = position.isLeft ? "0.5em" : (
+				position.isRight ? "-0.5em" : "0"
+			);
+		} else if (position.isTop) {
+			dx = "-0.5em";
+		}
+
+		return dx;
+	}
+
+	dyForAxisLabel(id: AxisType) {
 		const $$ = this.owner;
 		const {config} = $$;
 		const isRotated = config.axis_rotated;
 		const isInner = this.getAxisLabelPosition(id).isInner;
 		const tickRotate = config[`axis_${id}_tick_rotate`] ? $$.getHorizontalAxisHeight(id) : 0;
-		const maxTickWidth = this.getMaxTickWidth(id);
+		const {width: maxTickWidth} = this.getMaxTickSize(id);
 		let dy;
 
 		if (id === "x") {
@@ -562,26 +597,40 @@ class Axis {
 					dy = dy[2];
 				}
 			} else {
-				dy = isInner ?
-					dy[3] : (
-						dy[4] + (
-							config[`axis_${id}_inner`] ? 0 : (maxTickWidth + dy[4])
-						)
-					) * (id === "y" ? -1 : 1);
+				dy = isInner ? dy[3] : (
+					dy[4] + (
+						config[`axis_${id}_inner`] ? 0 : (maxTickWidth + dy[4])
+					)
+				) * (id === "y" ? -1 : 1);
 			}
 		}
 
 		return dy;
 	}
 
-	getMaxTickWidth(id: string, withoutRecompute?: boolean): number {
+	/**
+	 * Get max tick size
+	 * @param {string} id axis id string
+	 * @param {boolean} withoutRecompute wheather or not to recompute
+	 * @returns {object} {width, height}
+	 * @private
+	 */
+	getMaxTickSize(id: AxisType, withoutRecompute?: boolean): {width: number, height: number} {
 		const $$ = this.owner;
-		const {config, state: {current}, $el: {svg, chart}} = $$;
-		const currentTickMax = current.maxTickWidths[id];
-		let maxWidth = 0;
+		const {config, state: {current, resizing}, $el: {svg, chart}} = $$;
+		const currentTickMax = current.maxTickSize[id];
+		const configPrefix = `axis_${id}`;
+		const max = {
+			width: 0,
+			height: 0
+		};
 
-		if (withoutRecompute || !config[`axis_${id}_show`] || $$.filterTargetsToShow().length === 0) {
-			return currentTickMax.size;
+		if (
+			resizing || withoutRecompute || !config[`${configPrefix}_show`] || (
+				currentTickMax.width > 0 && $$.filterTargetsToShow().length === 0
+			)
+		) {
+			return currentTickMax;
 		}
 
 		if (svg) {
@@ -610,8 +659,9 @@ class Axis {
 			}
 
 			const axis = this.getAxis(id, scale, false, false, true);
-			const tickCount = config[`axis_${id}_tick_count`];
-			const tickValues = config[`axis_${id}_tick_values`];
+			const tickRotate = config[`${configPrefix}_tick_rotate`];
+			const tickCount = config[`${configPrefix}_tick_count`];
+			const tickValues = config[`${configPrefix}_tick_values`];
 
 			// Make to generate the final tick text to be rendered
 			// https://github.com/naver/billboard.js/issues/920
@@ -623,7 +673,8 @@ class Axis {
 						domain,
 						tickCount,
 						isYAxis ? this.isTimeSeriesY() : this.isTimeSeries()
-					));
+					)
+				);
 			}
 
 			!isYAxis && this.updateXAxisTickValues(targetsToShow, axis);
@@ -634,45 +685,82 @@ class Axis {
 				.style("top", "0")
 				.style("left", "0");
 
-			axis.create(dummy);
+			const g = dummy
+				.append("g")
+				.attr("class", `${$AXIS[`axis${capitalize(id)}`]} ${$COMMON.dummy}`);
 
-			dummy.selectAll("text")
-				.each(function(d, i) {
-					const currentTextWidth = this.getBoundingClientRect().width;
+			axis.create(g);
 
-					maxWidth = Math.max(maxWidth, currentTextWidth);
-					// cache tick text width for getXAxisTickTextY2Overflow()
+			// when evalTextSize is set as function, sizeFor1Char is set to the dummy element
+			const {sizeFor1Char} = g.node();
+
+			const textSelection = dummy.selectAll("text")
+				.attr("transform", isNumber(tickRotate) ? `rotate(${tickRotate})` : null);
+
+			// Batch processing to minimize layout thrashing
+			if (sizeFor1Char) {
+				// Use pre-calculated character size (no reflow needed)
+				textSelection.each(function(d, i) {
+					const width = this.textContent.length * sizeFor1Char.w;
+					const height = sizeFor1Char.h;
+
+					max.width = Math.max(max.width, width);
+					max.height = Math.max(max.height, height);
+
 					if (!isYAxis) {
-						currentTickMax.ticks[i] = currentTextWidth;
+						currentTickMax.ticks[i] = width;
 					}
 				});
+			} else {
+				const textNodes: SVGTextElement[] = [];
+
+				textSelection.each(function() {
+					textNodes.push(this);
+				});
+
+				textNodes.map(node => getBoundingRect(node, true)).forEach((dim, i) => {
+					max.width = Math.max(max.width, dim.width);
+					max.height = Math.max(max.height, dim.height);
+
+					if (!isYAxis) {
+						currentTickMax.ticks[i] = dim.width;
+					}
+				});
+			}
 
 			dummy.remove();
 		}
 
-		if (maxWidth > 0) {
-			currentTickMax.size = maxWidth;
-		}
+		Object.keys(max).forEach(key => {
+			if (max[key] > 0) {
+				currentTickMax[key] = max[key];
+			}
+		});
 
-		return currentTickMax.size;
+		return currentTickMax;
 	}
 
 	getXAxisTickTextY2Overflow(defaultPadding) {
 		const $$ = this.owner;
-		const {axis, config, state} = $$;
+		const {axis, config, state: {current, isLegendRight, legendItemWidth}} = $$;
 		const xAxisTickRotate = $$.getAxisTickRotate("x");
 		const positiveRotation = xAxisTickRotate > 0 && xAxisTickRotate < 90;
 
-		if ((axis.isCategorized() || axis.isTimeSeries()) &&
+		if (
+			(axis.isCategorized() || axis.isTimeSeries()) &&
 			config.axis_x_tick_fit &&
-			!config.axis_x_tick_culling &&
+			(!config.axis_x_tick_culling || isEmpty(config.axis_x_tick_culling)) &&
 			!config.axis_x_tick_multiline &&
 			positiveRotation
 		) {
-			const widthWithoutCurrentPaddingLeft = state.current.width - $$.getCurrentPaddingLeft();
+			const y2AxisWidth = (config.axis_y2_show && current.maxTickSize.y2.width) || 0;
+			const legendWidth = (isLegendRight && legendItemWidth) || 0;
+			const widthWithoutCurrentPaddingLeft = current.width -
+				$$.getCurrentPaddingByDirection("left");
 			const maxOverflow = this.getXAxisTickMaxOverflow(
-				xAxisTickRotate, widthWithoutCurrentPaddingLeft - defaultPadding
-			);
+				xAxisTickRotate,
+				widthWithoutCurrentPaddingLeft - defaultPadding
+			) - y2AxisWidth - legendWidth;
 			const xAxisTickTextY2Overflow = Math.max(0, maxOverflow) +
 				defaultPadding; // for display inconsistencies between browsers
 
@@ -687,7 +775,7 @@ class Axis {
 		const {axis, config, state} = $$;
 		const isTimeSeries = axis.isTimeSeries();
 
-		const tickTextWidths = state.current.maxTickWidths.x.ticks;
+		const tickTextWidths = state.current.maxTickSize.x.ticks;
 		const tickCount = tickTextWidths.length;
 		const {left, right} = state.axis.x.padding;
 		let maxOverflow = 0;
@@ -696,7 +784,8 @@ class Axis {
 
 		for (let i = 0; i < tickCount; i++) {
 			const tickIndex = i + 1;
-			const rotatedTickTextWidth = Math.cos(Math.PI * xAxisTickRotate / 180) * tickTextWidths[i];
+			const rotatedTickTextWidth = Math.cos(Math.PI * xAxisTickRotate / 180) *
+				tickTextWidths[i];
 			const ticksBeforeTickText = tickIndex - (isTimeSeries ? 1 : 0.5) + left;
 
 			// Skip ticks if there are no ticks before them
@@ -704,7 +793,8 @@ class Axis {
 				continue;
 			}
 
-			const xAxisLengthWithoutTickTextWidth = widthWithoutCurrentPaddingLeft - rotatedTickTextWidth;
+			const xAxisLengthWithoutTickTextWidth = widthWithoutCurrentPaddingLeft -
+				rotatedTickTextWidth;
 			const tickLength = xAxisLengthWithoutTickTextWidth / ticksBeforeTickText;
 			const remainingTicks = remaining - tickIndex;
 
@@ -722,39 +812,56 @@ class Axis {
 			!isTimeSeries &&
 			config.axis_x_tick_count <= filteredTargets.length && filteredTargets[0].values.length
 		) {
-			const scale = getScale($$.axis.getAxisType("x"), 0, widthWithoutCurrentPaddingLeft - maxOverflow)
+			const scale = getScale($$.axis.getAxisType("x"), 0,
+				widthWithoutCurrentPaddingLeft - maxOverflow)
 				.domain([
 					left * -1,
 					$$.getXDomainMax($$.data.targets) + 1 + right
 				]);
 
-			tickOffset = (Math.ceil((scale(1) - scale(0)) / 2));
+			tickOffset = (scale(1) - scale(0)) / 2;
 		}
 
 		return maxOverflow + tickOffset;
 	}
 
-	updateLabels(withTransition) {
+	/**
+	 * Update axis label text
+	 * @param {boolean} withTransition Weather update with transition
+	 * @private
+	 */
+	updateLabels(withTransition: boolean): void {
 		const $$ = this.owner;
-		const {$el: {main}, $T} = $$;
+		const {config, $el: {main}, $T} = $$;
+		const isRotated = config.axis_rotated;
 
-		const labels = {
-			x: main.select(`.${$AXIS.axisX} .${$AXIS.axisXLabel}`),
-			y: main.select(`.${$AXIS.axisY} .${$AXIS.axisYLabel}`),
-			y2: main.select(`.${$AXIS.axisY2} .${$AXIS.axisY2Label}`)
-		};
+		["x", "y", "y2"].forEach((id: AxisType) => {
+			const text = this.getLabelText(id);
+			const selector = `axis${capitalize(id)}`;
+			const classLabel = $AXIS[`${selector}Label`];
 
-		Object.keys(labels).filter(id => !labels[id].empty())
-			.forEach(v => {
-				const node = labels[v];
+			if (text) {
+				let axisLabel = main.select(`text.${classLabel}`);
+
+				// generate eleement if not exists
+				if (axisLabel.empty()) {
+					axisLabel = main.select(`g.${$AXIS[selector]}`)
+						.insert("text", ":first-child")
+						.attr("class", classLabel)
+						.attr("transform", ["rotate(-90)", null][
+							id === "x" ? +!isRotated : +isRotated
+						])
+						.style("text-anchor", () => this.textAnchorForAxisLabel(id));
+				}
 
 				// @check $$.$T(node, withTransition)
-				$T(node, withTransition)
-					.attr("x", () => this.xForAxisLabel(v))
-					.attr("dx", () => this.dxForAxisLabel(v))
-					.attr("dy", () => this.dyForAxisLabel(v))
-					.text(() => this.getLabelText(v));
-			});
+				$T(axisLabel, withTransition)
+					.attr("x", () => this.xForAxisLabel(id))
+					.attr("dx", () => this.dxForAxisLabel(id))
+					.attr("dy", () => this.dyForAxisLabel(id))
+					.text(text);
+			}
+		});
 	}
 
 	/**
@@ -766,8 +873,8 @@ class Axis {
 	 * @returns {number} Padding value in scale
 	 * @private
 	 */
-	getPadding(padding: number | {[key: string]: number},
-		key: string, defaultValue: number, domainLength: number): number {
+	getPadding(padding: number | Record<string, number>, key: string, defaultValue: number,
+		domainLength: number): number {
 		const p = isNumber(padding) ? padding : padding[key];
 
 		if (!isValue(p)) {
@@ -776,7 +883,8 @@ class Axis {
 
 		return this.owner.convertPixelToScale(
 			/(bottom|top)/.test(key) ? "y" : "x",
-			p, domainLength
+			p,
+			domainLength
 		);
 	}
 
@@ -835,7 +943,7 @@ class Axis {
 
 	redraw(transitions, isHidden, isInit) {
 		const $$ = this.owner;
-		const {config, $el} = $$;
+		const {config, state, $el} = $$;
 		const opacity = isHidden ? "0" : null;
 
 		["x", "y", "y2", "subX"].forEach(id => {
@@ -853,6 +961,7 @@ class Axis {
 		});
 
 		this.updateAxes();
+		!state.rendered && config.axis_tooltip && this.setAxisTooltip();
 	}
 
 	/**
@@ -876,7 +985,8 @@ class Axis {
 
 		if (scale.x && targetsToShow.length) {
 			!hasZoom &&
-				$$.updateXDomain(targetsToShow, wth.UpdateXDomain, wth.UpdateOrgXDomain, wth.TrimXDomain);
+				$$.updateXDomain(targetsToShow, wth.UpdateXDomain, wth.UpdateOrgXDomain,
+					wth.TrimXDomain);
 
 			if (!config.axis_x_tick_values) {
 				this.updateXAxisTickValues(targetsToShow);
@@ -952,7 +1062,8 @@ class Axis {
 
 			if (axis && toCull) {
 				const tickNodes = axis.selectAll(".tick");
-				const tickValues = sortValue(tickNodes.data());
+				const tickValues = sortValue(tickNodes.data(),
+					!config[`${cullingOptionPrefix}_reverse`]);
 				const tickSize = tickValues.length;
 				const cullingMax = config[`${cullingOptionPrefix}_max`];
 				const lines = config[`${cullingOptionPrefix}_lines`];
@@ -966,23 +1077,72 @@ class Axis {
 						}
 					}
 
-					tickNodes.each(function(d) {
-						if (tickValues.indexOf(d) % intervalForCulling) {
-							const node = (lines ? this.querySelector("text") : this);
+					tickNodes
+						.each(function(d) {
+							const node = lines ? this.querySelector("text") : this;
 
-							node && (node.style.display = "none");
-						}
-					});
+							if (node) {
+								node.style.display = tickValues.indexOf(d) % intervalForCulling ?
+									"none" :
+									null;
+							}
+						});
 				} else {
 					tickNodes.style("display", null);
 				}
 
 				// set/unset x_axis_tick_clippath
 				if (type === "x") {
-					const clipPath = current.maxTickWidths.x.clipPath ? clip.pathXAxisTickTexts : null;
+					const clipPath = current.maxTickSize.x.clipPath ?
+						clip.pathXAxisTickTexts :
+						null;
 
 					$el.svg.selectAll(`.${$AXIS.axisX} .tick text`)
 						.attr("clip-path", clipPath);
+				}
+			}
+		});
+	}
+
+	/**
+	 * Set axis tooltip
+	 * @private
+	 */
+	setAxisTooltip(): void {
+		const $$ = this.owner;
+		const {config: {axis_rotated: isRotated, axis_tooltip}, $el: {axis, axisTooltip}} = $$;
+		const bgColor = axis_tooltip.backgroundColor ?? "black";
+
+		$$.generateTextBGColorFilter(
+			bgColor,
+			{
+				x: -0.15,
+				y: -0.2,
+				width: 1.3,
+				height: 1.3
+			}
+		);
+
+		["x", "y", "y2"].forEach(v => {
+			if (isString(bgColor) || bgColor[v]) {
+				axisTooltip[v] = axis[v]?.append("text")
+					.classed($AXIS[`axis${v.toUpperCase()}Tooltip`], true)
+					.attr("filter", $$.updateTextBGColor({id: v}, bgColor));
+
+				if (isRotated) {
+					const pos = v === "x" ? "x" : "y";
+					const val = v === "y" ? "1.15em" : (v === "x" ? "-0.3em" : "-0.4em");
+
+					axisTooltip[v]?.attr(pos, val)
+						.attr(`d${v === "x" ? "y" : "x"}`, v === "x" ? "0.4em" : "-1.3em")
+						.style("text-anchor", v === "x" ? "end" : null);
+				} else {
+					const pos = v === "x" ? "y" : "x";
+					const val = v === "x" ? "1.15em" : `${v === "y" ? "-" : ""}0.4em`;
+
+					axisTooltip[v]?.attr(pos, val)
+						.attr(`d${v === "x" ? "x" : "y"}`, v === "x" ? "-1em" : "0.3em")
+						.style("text-anchor", v === "y" ? "end" : null);
 				}
 			}
 		});

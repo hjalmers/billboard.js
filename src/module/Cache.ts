@@ -2,8 +2,8 @@
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-import {isValue, toArray} from "./util";
-import {DataRow} from "../../types/types";
+import type {DataRow} from "../../types/types";
+import {isString, isValue} from "./util";
 
 /**
  * Constant for cache key
@@ -16,11 +16,18 @@ export const KEY = {
 	dataMinMax: "$dataMinMax",
 	dataTotalSum: "$dataTotalSum",
 	dataTotalPerIndex: "$totalPerIndex",
+	domainMinMax: "$domainMinMax",
+	filteredTargets: "$filteredTargets",
+	filteredNullish: "$filteredNullish",
+	visibilityChecksum: "visibilityChecksum",
 	legendItemTextBox: "legendItemTextBox",
+	legendItemMap: "$legendItemMap",
 	radarPoints: "$radarPoints",
+	radarTextWidth: "$radarTextWidth",
 	setOverOut: "setOverOut",
 	callOverOutForTouch: "callOverOutForTouch",
-	textRect: "textRect"
+	textRect: "textRect",
+	shapeOffset: "$shapeOffset"
 };
 
 export default class Cache {
@@ -29,9 +36,9 @@ export default class Cache {
 	/**
 	 * Add cache
 	 * @param {string} key Cache key
-	 * @param {*} value Value to be stored
+	 * @param {string|number|boolean|object|Array|function|null|undefined} value Value to be stored
 	 * @param {boolean} isDataType Weather the cache is data typed '{id:'data', id_org: 'data', values: [{x:0, index:0,...}, ...]}'
-	 * @returns {*} Added data value
+	 * @returns {string|number|boolean|object|Array|function|null|undefined} Added data value
 	 * @private
 	 */
 	add(key: string, value, isDataType = false) {
@@ -45,18 +52,20 @@ export default class Cache {
 	 * @private
 	 */
 	remove(key: string | string[]) {
-		toArray(key).forEach(v => delete this.cache[v]);
+		(isString(key) ? [key] : key)
+			.forEach(v => delete this.cache[v]);
 	}
 
 	/**
 	 * Get cahce
 	 * @param {string|Array} key Cache key
 	 * @param {boolean} isDataType Weather the cache is data typed '{id:'data', id_org: 'data', values: [{x:0, index:0,...}, ...]}'
-	 * @returns {*}
+	 * @returns {string|number|boolean|object|Array|function|null} Cached value
 	 * @private
 	 */
-	get(key: string, isDataType = false): any | null {
-		if (isDataType) {
+	get(key: string | string[], isDataType = false): any | null {
+		// when is isDataType, key should be string array
+		if (isDataType && Array.isArray(key)) {
 			const targets: any[] = [];
 
 			for (let i = 0, id; (id = key[i]); i++) {
@@ -67,10 +76,29 @@ export default class Cache {
 
 			return targets;
 		} else {
-			const value = this.cache[key];
+			const value = this.cache[key as string];
 
 			return isValue(value) ? value : null;
 		}
+	}
+
+	/**
+	 * Check if cache key exists
+	 * @param {string} key Cache key
+	 * @returns {boolean} True if key exists in cache
+	 * @private
+	 */
+	has(key: string): boolean {
+		return key in this.cache && this.cache[key] !== null;
+	}
+
+	/**
+	 * Get all cache keys
+	 * @returns {string[]} Array of cache keys
+	 * @private
+	 */
+	getKeys(): string[] {
+		return Object.keys(this.cache);
 	}
 
 	/**
@@ -95,7 +123,6 @@ export default class Cache {
 	 * @returns {object}
 	 * @private
 	 */
-	// eslint-disable-next-line camelcase
 	cloneTarget(target: DataRow): DataRow {
 		return {
 			id: target.id,

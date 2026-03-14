@@ -18,7 +18,9 @@ var billboardDemo = {
 		this.$title = document.getElementById("title");
 		this.$description = document.getElementById("description");
 		this.$codeArea = document.querySelector(".code");
+		this.$gridArea = document.querySelector(".example-grid");
 		this.$launch = document.getElementById("launch");
+		this.$themeSelect = document.querySelector("#theme select");
 
 		this.$html = document.querySelector("code.html");
 		this.$code = document.querySelector("code.javascript");
@@ -66,7 +68,10 @@ var billboardDemo = {
 		});
 
 		window.addEventListener("hashchange", function() {
-			ctx.showDemo(location.hash);
+			if (location.hash) {
+				ctx.destroyChart();
+				ctx.showDemo(location.hash);
+			}
 		});
 
 		this.$code.addEventListener("keydown", function(e) {
@@ -114,10 +119,12 @@ var billboardDemo = {
 		Object.keys(demos).forEach(function(key) {
 			html.push("<li><h4>" + key + "</h4>");
 
-			Object.keys(demos[key]).sort().forEach(function (v, i) {
-				i === 0 && html.push("<ul>");
-				html.push("<li><a href='#"+ [key, v].join(".") + "'>" + v + "</a></li>");
-			});
+			Object.keys(demos[key])
+				.sort(Intl.Collator().compare)
+				.forEach(function (v, i) {
+					i === 0 && html.push("<ul>");
+					html.push("<li><a href='#"+ [key, v].join(".") + "'>" + v + "</a></li>");
+				});
 
 			html.push("</ul></li>");
 		});
@@ -131,10 +138,6 @@ var billboardDemo = {
 	 * @param {String} type
 	 */
 	showDemo: function(type) {
-		if (!type) {
-			return;
-		}
-
 		// remove legend
 		var $legend = document.querySelector(".legend");
 		$legend && $legend.parentNode.removeChild($legend);
@@ -143,16 +146,27 @@ var billboardDemo = {
 			this.$wrapper.className = "";
 		}
 
-		type = type.replace("#", "").split(".");
+		document.querySelector(".chart_area").style.width = "";
 
-		this.generate(type[0], type[1]);
+		type = type.replace("#", "").split(".");
+		this.$gridArea.classList.add("example-grid");
+
+		try {
+			this.generate(type[0], type[1]);
+		} catch(e) {}
 
 		this.$title.innerHTML = type[1]
 			.replace(/([A-Z][a-z])/g, " $1")
 			.replace(/([A-Z]+)/g, " $1");
 
 		// set description
-		this.$description.innerHTML = demos[type[0]][type[1]].description || "";
+		let desc = demos[type[0]][type[1]];
+		
+		if (!type || !desc) {
+			return;
+		}
+
+		this.$description.innerHTML = desc.description || (Array.isArray(desc) && desc[0].description) || "";
 		this.$codeArea.style.display = "block";
 
 		// remove selected class
@@ -162,26 +176,34 @@ var billboardDemo = {
 		// add selected class
 		$selected = this.$list.querySelector("[href='#"+ type.join(".") +"']");
 		$selected.className += this.selectedClass;
-
+		
 		window.scrollTo(0, 0);
+		
+		!this.isVisible($selected) && $selected.scrollIntoView({
+			behavior: "auto",
+			block: "start"
+		});
+	},
+
+	isVisible($el) {
+		const {clientWidth, clientHeight} = document.documentElement;
+		const {top, right, bottom, left} = $el.getBoundingClientRect();
+	  
+		return top <= clientHeight && 
+			right >= 0 && 
+			bottom >= 0 &&
+			left <= clientWidth;
 	},
 
 	/**
-	 * Generate chart demo
-	 * @param {String} type
-	 * @param {String} key
-	 * @returns {boolean}
+	 * Destroy chart
+	 * @param {Array} inst
 	 */
-	generate: function(type, key) {
-		var inst = bb.instance;
-		var typeData = demos[type][key];
-		var isArray = typeData && typeData.constructor === Array;
-		var camelize = function(s) {
-			return s.replace(/-./g, function(x) { return x.toUpperCase()[1] });
-		}
-		var self = this;
+	destroyChart: function() {
+		var inst = new WeakRef(bb.instance.concat());
+		bb.instance.splice(0, bb.instance.length);
 
-		inst.length && inst.forEach(function (c) {
+		inst.deref()?.forEach(function (c) {
 			var timer = c.timer;
 			var el = c.$.chart;
 
@@ -194,7 +216,23 @@ var billboardDemo = {
 				c.destroy();
 			}
 		});
+	},
 
+	/**
+	 * Generate chart demo
+	 * @param {String} type
+	 * @param {String} key
+	 * @returns {boolean}
+	 */
+	generate: function(type, key) {
+		var typeData = demos[type][key];
+		var isArray = typeData && typeData.constructor === Array;
+		var hasPlugin = /plugin/i.test(type);
+		var pluginName = key.replace(/Diagram/, "").toLowerCase() || "";
+		var camelize = function(s) {
+			return s.replace(/-./g, function(x) { return x.toUpperCase()[1] });
+		}
+		var self = this;
 		var code = {
 			markup: [],
 			data: [],
@@ -212,7 +250,7 @@ var billboardDemo = {
 
 		// UMD
 		code.data = code.data.join("")
-			.replace(/"(area|area-line-range|area-spline|area-spline-range|area-step|bar|bubble|candlestick|donut|gauge|line|pie|radar|scatter|spline|step|selection|subchart|zoom)(\(\))?",?/g, function(match, p1, p2, p3, offset, string) {
+			.replace(/"(area|area-line-range|area-spline|area-spline-range|area-step|area-step-range|bar|bubble|candlestick|donut|funnel|gauge|line|pie|polar|radar|scatter|spline|step|treemap|selection|subchart|zoom)(\(\))?",?/g, function(match, p1, p2, p3, offset, string) {
 				var module = camelize(p1);
 		
 				code.esm.indexOf(module) === -1 &&
@@ -224,9 +262,13 @@ var billboardDemo = {
 			});
 
 		this.$code.innerHTML = '// for ESM environment, need to import modules as:\r\n' +
-'// import bb, {'+ code.esm.join(", ") +'} from "billboard.js"\r\n\r\n' +
-code.data;
+'// import bb, {'+ code.esm.join(", ") +'} from "billboard.js";\r\n';
 
+		if (hasPlugin) {
+			this.$code.innerHTML += '// import '+ pluginName +' from "billboard.js/dist/plugin/billboardjs-plugin-'+ pluginName +'";\r\n';
+		}
+
+		this.$code.innerHTML += '\r\n'+ code.data;
 		this.$code.scrollTop = 0;
 
 		hljs.highlightBlock(this.$html);
@@ -244,7 +286,7 @@ code.data;
 				.then(function() {
 					ctx.showCopyMsg();
 				}, function(e) {
-					console.error("An error occured:", errMsg);
+					console.error("An error occurred:", errMsg);
 				});
 		} else {
 			var textArea = document.createElement("textarea");
@@ -280,12 +322,13 @@ code.data;
 				document.execCommand("copy");
 				ctx.showCopyMsg();
 			} catch (e) {
-				console.error("An error occured:", errMsg);
+				console.error("An error occurred:", errMsg);
 			}
 
 			document.body.removeChild(textArea);
 		}
 	},
+
 	showCopyMsg: function() {
 		if (this.timer.btn) {
 			return;
@@ -302,6 +345,7 @@ code.data;
 			ctx.timer.btn = null;
 		}, 1000);
 	},
+
 	getLowerFirstCase: function(str) {
 		return /^(JSON)/.test(str) ?
 			str : str.charAt(0).toLowerCase() + str.slice(1);
@@ -323,10 +367,10 @@ code.data;
 
 		val.forEach(function(p) {
 			Object.keys(p).forEach(function(key) {
-				plugins += "new bb.plugin."+ key +"(";
+				plugins += "new bb.plugin."+ key +"({ // for ESM specify as: new "+ key +"()";
 				plugins += JSON.stringify(p[key], function(k, v) {
 					return typeof v === "function" ? v.toString() : v;
-				}, 5).replace(/\\n/g, "\n").replace(/}$/, "    }");
+				}, 5).replace(/\\n/g, "\n").replace(/}$/g, "    }").replace(/{/g, "");
 				plugins += "),";
 			})
 		});
@@ -349,7 +393,7 @@ code.data;
 						.replace(/(\"|\d),/g, "$1, ");
 
 					return k === "json" ?
-						str.replace(/{/, "{\r\n\t").replace(/}/, "\r\n    }") : str;
+						str.replace(/{/g, "{\r\n\t").replace(/}/g, "\r\n    }") : str;
 				} else if (k === "_plugins") {
 					return [self.getPluginsCodeStr(v)];
 				}
@@ -359,9 +403,10 @@ code.data;
 			.replace("_plugins", "plugins")
 			.replace(new RegExp('"?'+ this.replacer.plugin +'"?', "g"), "");
 
-			if (/multiline/i.test(options.bindto)) {
+			if (/(polarChart|multiline|gaugeneedle)/i.test(options.bindto)) {
 				codeStr = codeStr.replace(/\\n(?=(\t|\s+))/g, "")
-					.replace(/\\\\n(?=[a-zA-Z0-9])/g, "\\n");
+					.replace(/\\\\n(?=[a-zA-Z0-9])/g, "\\n")
+					.replace('+"\\\\n"+', '+"\\n"+');
 			} else {
 				codeStr = codeStr.replace(/\\n(?!T)/g, "\n")
 					.replace(/\\(u)/g, "\$1");
@@ -393,8 +438,9 @@ code.data;
 				this.$chartArea.innerHTML = "";
 			}
 
+			index > 1 && this.$chartArea.appendChild(document.createElement("hr"));
 			this.$chartArea.appendChild($el);
-
+			
 			if (/^(legend|tooltip)Template/.test(key) || /(sparkline)/.test(key)) {
 				const name = RegExp.$1;
 				let attrName = "id";
@@ -457,7 +503,7 @@ code.data;
 				code.data.push("\r\n\r\n" + func.toString()
 					.replace(/[\t\s]*function\s*\(chart[\d+]?\) \{[\r\n\t\s]*/, "")
 					.replace(/}$/, "")
-					.replace(/chart.timer = \[[\r\n\t\s]*/, "")
+					.replace(/chart[\d]?.timer = \[[\r\n\t\s]*/, "")
 					.replace(/\t{5}/g, "")
 					.replace(/[\r\n\t\s]*\];?[\r\n\t\s]*$/, "")
 					.replace(/(\d)\),?/g, "$1);"));
@@ -481,10 +527,14 @@ code.data;
 	editor: function(bodyCode, type, isOpen) {
 		var id = (bodyCode && bodyCode.match(/bindto: \"#(.*)\"/) || [,"chart"])[1];
 		var html = "<div id='"+ id +"'></div>";
+		var theme = this.$themeSelect.value;
+
+		theme = theme ? "theme/"+ theme :  "billboard"
+
 		var code = {
 			import: [
 				'// base css',
-				'import "billboard.js/dist/theme/insight.css";',
+				'import "billboard.js/dist/'+ theme +'.css";',
 				'import bb from "billboard.js";',
 			].join("\r\n"),
 			body: bodyCode || [
@@ -516,13 +566,13 @@ code.data;
 		project.files["index."+ type.toLowerCase()] = code.import +"\r\n\r\n"+ code.body;
 
 		this.$wrapper.className = "";
+		this.$gridArea.className = "";
 
 		if (isOpen) {
 			StackBlitzSDK.openProject(project);
 		} else {
 			this.$title.innerHTML = "Code Editor ("+ type +")";
 			this.$codeArea.style.display = "none";
-			location.hash = "";
 
 			if (!this.$chartArea.querySelector("#editor")) {
 				this.$chartArea.innerHTML = "<div id='editor'></div>";
