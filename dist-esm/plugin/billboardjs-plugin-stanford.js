@@ -5,17 +5,15 @@
  * billboard.js, JavaScript chart library
  * https://naver.github.io/billboard.js/
  * 
- * @version 3.3.3-nightly-20220303005130
+ * @version 3.18.0-nightly-20260314005324
  * @requires billboard.js
  * @summary billboard.js plugin
 */
 import { interpolateHslLong } from 'd3-interpolate';
-import { hsl } from 'd3-color';
-import { scaleSequential, scaleLog, scaleSequentialLog } from 'd3-scale';
+import { scaleSequential, scaleSymlog, scaleSequentialLog } from 'd3-scale';
 import { axisRight } from 'd3-axis';
-import { format } from 'd3-format';
 
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -29,58 +27,33 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
-/* global Reflect, Promise */
-var _extendStatics = function extendStatics(d, b) {
-  _extendStatics = Object.setPrototypeOf || {
-    __proto__: []
-  } instanceof Array && function (d, b) {
-    d.__proto__ = b;
-  } || function (d, b) {
-    for (var p in b) {
-      if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
-    }
-  };
-
-  return _extendStatics(d, b);
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
 };
 
 function __extends(d, b) {
-  if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + (b + "") + " is not a constructor or null");
-
-  _extendStatics(d, b);
-
-  function __() {
-    this.constructor = d;
-  }
-
-  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
 
-var _assign = function __assign() {
-  _assign = Object.assign || function (t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-      s = arguments[i];
-
-      for (var p in s) {
-        if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
-      }
-    }
-
-    return t;
-  };
-
-  return _assign.apply(this, arguments);
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
 };
-function __spreadArray(to, from, pack) {
-  if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-    if (ar || !(i in from)) {
-      if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-      ar[i] = from[i];
-    }
-  }
-  return to.concat(ar || Array.prototype.slice.call(from));
-}
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
@@ -96,16 +69,20 @@ var $COMMON = {
     empty: "bb-empty",
     main: "bb-main",
     target: "bb-target",
-    EXPANDED: "_expanded_"
+    EXPANDED: "_expanded_",
+    dummy: "_dummy_"
 };
 var $ARC = {
     arc: "bb-arc",
     arcLabelLine: "bb-arc-label-line",
+    arcLabelLineText: "bb-arc-label-line-text",
+    arcRange: "bb-arc-range",
     arcs: "bb-arcs",
     chartArc: "bb-chart-arc",
     chartArcs: "bb-chart-arcs",
     chartArcsBackground: "bb-chart-arcs-background",
-    chartArcsTitle: "bb-chart-arcs-title"
+    chartArcsTitle: "bb-chart-arcs-title",
+    needle: "bb-needle"
 };
 var $AREA = {
     area: "bb-area",
@@ -118,13 +95,19 @@ var $AXIS = {
     axisY: "bb-axis-y",
     axisY2: "bb-axis-y2",
     axisY2Label: "bb-axis-y2-label",
-    axisYLabel: "bb-axis-y-label"
+    axisYLabel: "bb-axis-y-label",
+    axisXTooltip: "bb-axis-x-tooltip",
+    axisYTooltip: "bb-axis-y-tooltip",
+    axisY2Tooltip: "bb-axis-y2-tooltip",
+    axisTooltipX: "bb-axis-tooltip-x",
+    axisTooltipY: "bb-axis-tooltip-y"
 };
 var $BAR = {
     bar: "bb-bar",
     bars: "bb-bars",
     chartBar: "bb-chart-bar",
-    chartBars: "bb-chart-bars"
+    chartBars: "bb-chart-bars",
+    barConnectLine: "bb-bar-connectLine"
 };
 var $CANDLESTICK = {
     candlestick: "bb-candlestick",
@@ -146,6 +129,12 @@ var $COLOR = {
 var $DRAG = {
     dragarea: "bb-dragarea",
     INCLUDED: "_included_"
+};
+var $FUNNEL = {
+    funnel: "bb-funnel",
+    chartFunnel: "bb-chart-funnel",
+    chartFunnels: "bb-chart-funnels",
+    funnelBackground: "bb-funnel-background"
 };
 var $GAUGE = {
     chartArcsGaugeMax: "bb-chart-arcs-gauge-max",
@@ -196,9 +185,7 @@ var $GRID = {
 };
 var $RADAR = {
     chartRadar: "bb-chart-radar",
-    chartRadars: "bb-chart-radars",
-    level: "bb-level",
-    levels: "bb-levels"
+    chartRadars: "bb-chart-radars"
 };
 var $REGION = {
     region: "bb-region",
@@ -223,6 +210,8 @@ var $TEXT = {
     text: "bb-text",
     texts: "bb-texts",
     title: "bb-title",
+    textBorderRect: "bb-text-border",
+    textLabelImage: "bb-text-label-image",
     TextOverlapping: "text-overlapping"
 };
 var $TOOLTIP = {
@@ -230,26 +219,39 @@ var $TOOLTIP = {
     tooltipContainer: "bb-tooltip-container",
     tooltipName: "bb-tooltip-name"
 };
+var $TREEMAP = {
+    treemap: "bb-treemap",
+    chartTreemap: "bb-chart-treemap",
+    chartTreemaps: "bb-chart-treemaps"
+};
 var $ZOOM = {
     buttonZoomReset: "bb-zoom-reset",
     zoomBrush: "bb-zoom-brush"
 };
-_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign({}, $COMMON), $ARC), $AREA), $AXIS), $BAR), $CANDLESTICK), $CIRCLE), $COLOR), $DRAG), $GAUGE), $LEGEND), $LINE), $EVENT), $FOCUS), $GRID), $RADAR), $REGION), $SELECT), $SHAPE), $SUBCHART), $TEXT), $TOOLTIP), $ZOOM);
+__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign({}, $COMMON), $ARC), $AREA), $AXIS), $BAR), $CANDLESTICK), $CIRCLE), $COLOR), $DRAG), $GAUGE), $LEGEND), $LINE), $EVENT), $FOCUS), $FUNNEL), $GRID), $RADAR), $REGION), $SELECT), $SHAPE), $SUBCHART), $TEXT), $TOOLTIP), $TREEMAP), $ZOOM);
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-var win = (function () {
-    var root = (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object && globalThis) ||
+/**
+ * Window object
+ * @private
+ */
+/* eslint-disable no-new-func, no-undef */
+/**
+ * Get global object
+ * @returns {object} window object
+ * @private
+ */
+function getGlobal() {
+    return (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object &&
+        globalThis) ||
         (typeof global === "object" && global !== null && global.Object === Object && global) ||
-        (typeof self === "object" && self !== null && self.Object === Object && self);
-    return root || Function("return this")();
-})();
-/* eslint-enable no-new-func, no-undef */
-// fallback for non-supported environments
-win.requestIdleCallback = win.requestIdleCallback || (function (cb) { return setTimeout(cb, 1); });
-win.cancelIdleCallback = win.cancelIdleCallback || (function (id) { return clearTimeout(id); });
+        (typeof self === "object" && self !== null && self.Object === Object && self) ||
+        Function("return this")();
+}
+var win = getGlobal();
 var doc = win === null || win === void 0 ? void 0 : win.document;
 
 var isFunction = function (v) { return typeof v === "function"; };
@@ -258,55 +260,16 @@ var isNumber = function (v) { return typeof v === "number"; };
 var isUndefined = function (v) { return typeof v === "undefined"; };
 var isDefined = function (v) { return typeof v !== "undefined"; };
 var isObjectType = function (v) { return typeof v === "object"; };
+var isEmptyObject = function (obj) {
+    for (var x in obj) {
+        return false;
+    }
+    return true;
+};
 var isEmpty = function (o) { return (isUndefined(o) || o === null ||
     (isString(o) && o.length === 0) ||
-    (isObjectType(o) && !(o instanceof Date) && Object.keys(o).length === 0) ||
+    (isObjectType(o) && !(o instanceof Date) && isEmptyObject(o)) ||
     (isNumber(o) && isNaN(o))); };
-/**
- * Check if is array
- * @param {Array} arr Data to be checked
- * @returns {boolean}
- * @private
- */
-var isArray = function (arr) { return Array.isArray(arr); };
-/**
- * Check if is object
- * @param {object} obj Data to be checked
- * @returns {boolean}
- * @private
- */
-var isObject = function (obj) { return obj && !(obj === null || obj === void 0 ? void 0 : obj.nodeType) && isObjectType(obj) && !isArray(obj); };
-/**
- * Merge object returning new object
- * @param {object} target Target object
- * @param {object} objectN Source object
- * @returns {object} merged target object
- * @private
- */
-function mergeObj(target) {
-    var objectN = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        objectN[_i - 1] = arguments[_i];
-    }
-    if (!objectN.length || (objectN.length === 1 && !objectN[0])) {
-        return target;
-    }
-    var source = objectN.shift();
-    if (isObject(target) && isObject(source)) {
-        Object.keys(source).forEach(function (key) {
-            var value = source[key];
-            if (isObject(value)) {
-                !target[key] && (target[key] = {});
-                target[key] = mergeObj(target[key], value);
-            }
-            else {
-                target[key] = isArray(value) ?
-                    value.concat() : value;
-            }
-        });
-    }
-    return mergeObj.apply(void 0, __spreadArray([target], objectN, false));
-}
 /**
  * Get range
  * @param {number} start Start number
@@ -316,7 +279,6 @@ function mergeObj(target) {
  * @private
  */
 var getRange = function (start, end, step) {
-    if (step === void 0) { step = 1; }
     var res = [];
     var n = Math.max(0, Math.ceil((end - start) / step)) | 0;
     for (var i = start; i < n; i++) {
@@ -328,7 +290,12 @@ var getRange = function (start, end, step) {
 ({
     mouse: (function () {
         var getParams = function () { return ({
-            bubbles: false, cancelable: false, screenX: 0, screenY: 0, clientX: 0, clientY: 0
+            bubbles: false,
+            cancelable: false,
+            screenX: 0,
+            screenY: 0,
+            clientX: 0,
+            clientY: 0
         }); };
         try {
             // eslint-disable-next-line no-new
@@ -338,7 +305,7 @@ var getRange = function (start, end, step) {
                 el.dispatchEvent(new MouseEvent(eventType, params));
             };
         }
-        catch (e) {
+        catch (_a) {
             // Polyfills DOM4 MouseEvent
             return function (el, eventType, params) {
                 if (params === void 0) { params = getParams(); }
@@ -349,26 +316,7 @@ var getRange = function (start, end, step) {
                 el.dispatchEvent(mouseEvent);
             };
         }
-    })(),
-    touch: function (el, eventType, params) {
-        var touchObj = new Touch(mergeObj({
-            identifier: Date.now(),
-            target: el,
-            radiusX: 2.5,
-            radiusY: 2.5,
-            rotationAngle: 10,
-            force: 0.5
-        }, params));
-        el.dispatchEvent(new TouchEvent(eventType, {
-            cancelable: true,
-            bubbles: true,
-            shiftKey: true,
-            touches: [touchObj],
-            targetTouches: [],
-            changedTouches: [touchObj]
-        }));
-    }
-});
+    })()});
 /**
  * Get parsed date value
  * (It must be called in 'ChartInternal' context)
@@ -377,13 +325,16 @@ var getRange = function (start, end, step) {
  * @private
  */
 function parseDate(date) {
+    var _a;
     var parsedDate;
     if (date instanceof Date) {
         parsedDate = date;
     }
     else if (isString(date)) {
-        var _a = this, config = _a.config, format = _a.format;
-        parsedDate = format.dataTime(config.data_xFormat)(date);
+        var _b = this, config = _b.config, format = _b.format;
+        // if fails to parse, try by new Date()
+        // https://github.com/naver/billboard.js/issues/1714
+        parsedDate = (_a = format.dataTime(config.data_xFormat)(date)) !== null && _a !== void 0 ? _a : new Date(date);
     }
     else if (isNumber(date) && !isNaN(date)) {
         parsedDate = new Date(+date);
@@ -395,10 +346,6 @@ function parseDate(date) {
     return parsedDate;
 }
 
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
 /**
  * Load configuration option
  * @param {object} config User's generation config value
@@ -428,18 +375,20 @@ function loadConfig(config) {
             thisConfig[key] = read;
         }
     });
+    // only should run in the ChartInternal context
+    if (this.api) {
+        this.state.orgConfig = config;
+    }
 }
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-
 /**
  * Base class to generate billboard.js plugin
  * @class Plugin
  */
-
 /**
  * Version info string for plugin
  * @name version
@@ -449,224 +398,57 @@ function loadConfig(config) {
  * @example
  *   bb.plugin.stanford.version;  // ex) 1.9.0
  */
-var Plugin = /*#__PURE__*/function () {
-  /**
-   * Version info string for plugin
-   * @name version
-   * @static
-   * @memberof Plugin
-   * @type {String}
-   * @example
-   *   bb.plugin.stanford.version;  // ex) 1.9.0
-   */
-
-  /**
-   * Constructor
-   * @param {Any} options config option object
-   * @private
-   */
-  function Plugin(options) {
-    if (options === void 0) {
-      options = {};
+var Plugin = /** @class */ (function () {
+    /**
+     * Constructor
+     * @param {Any} options config option object
+     * @private
+     */
+    function Plugin(options) {
+        if (options === void 0) { options = {}; }
+        this.options = options;
     }
-    this.options = options;
-  }
-  /**
-   * Lifecycle hook for 'beforeInit' phase.
-   * @private
-   */
-
-
-  var _proto = Plugin.prototype;
-
-  _proto.$beforeInit = function $beforeInit() {}
-  /**
-   * Lifecycle hook for 'init' phase.
-   * @private
-   */
-  ;
-
-  _proto.$init = function $init() {}
-  /**
-   * Lifecycle hook for 'afterInit' phase.
-   * @private
-   */
-  ;
-
-  _proto.$afterInit = function $afterInit() {}
-  /**
-   * Lifecycle hook for 'redraw' phase.
-   * @private
-   */
-  ;
-
-  _proto.$redraw = function $redraw() {}
-  /**
-   * Lifecycle hook for 'willDestroy' phase.
-   * @private
-   */
-  ;
-
-  _proto.$willDestroy = function $willDestroy() {
-    var _this = this;
-
-    Object.keys(this).forEach(function (key) {
-      _this[key] = null;
-      delete _this[key];
-    });
-  };
-
-  return Plugin;
-}();
-
-Plugin.version = "#3.3.3-nightly-20220303005130#";
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-/**
- * Stanford diagram plugin option class
- * @class StanfordOptions
- * @param {Options} options Stanford plugin options
- * @augments Plugin
- * @returns {StanfordOptions}
- * @private
- */
-var Options = /** @class */ (function () {
-    function Options() {
-        return {
-            /**
-             * Set the color of the color scale. This function receives a value between 0 and 1, and should return a color.
-             * @name colors
-             * @memberof plugin-stanford
-             * @type {Function}
-             * @default undefined
-             * @example
-             *   colors: d3.interpolateHslLong(
-             *      d3.hsl(250, 1, 0.5), d3.hsl(0, 1, 0.5)
-             *   )
-             */
-            colors: undefined,
-            /**
-             * Specify the key of epochs values in the data.
-             * @name epochs
-             * @memberof plugin-stanford
-             * @type {Array}
-             * @default []
-             * @example
-             * 	epochs: [ 1, 1, 2, 2, ... ]
-             */
-            epochs: [],
-            /**
-             * Show additional lines anywhere on the chart.
-             * - Each line object should consist with following options:
-             *
-             * | Key | Type | Description |
-             * | --- | --- | --- |
-             * | x1 | Number | Starting position on the x axis |
-             * | y1 | Number | Starting position on the y axis |
-             * | x2 | Number | Ending position on the x axis  |
-             * | y2 | Number | Ending position on the y axis |
-             * | class | String | Optional value. Set a custom css class to this line. |
-             * @type {Array}
-             * @memberof plugin-stanford
-             * @default []
-             * @example
-             *   lines: [
-             *       { x1: 0, y1: 0, x2: 65, y2: 65, class: "line1" },
-             *       { x1: 0, x2: 65, y1: 40, y2: 40, class: "line2" }
-             *   ]
-             */
-            lines: [],
-            /**
-             * Set scale values
-             * @name scale
-             * @memberof plugin-stanford
-             * @type {object}
-             * @property {object} [scale] scale object
-             * @property {number} [scale.min=undefined] Minimum value of the color scale. Default: lowest value in epochs
-             * @property {number} [scale.max=undefined] Maximum value of the color scale. Default: highest value in epochs
-             * @property {number} [scale.width=20] Width of the color scale
-             * @property {string|Function} [scale.format=undefined] Format of the axis of the color scale. Use 'pow10' to format as powers of 10 or a custom function. Example: d3.format("d")
-             * @example
-             *  scale: {
-             *    max: 10000,
-             *    min: 1,
-             *    width: 500,
-             *
-             *    // specify 'pow10' to format as powers of 10
-             *    format: "pow10",
-             *
-             *    // or specify a format function
-             *    format: function(x) {
-             *    	return x +"%";
-             *    }
-             *  },
-             */
-            scale_min: undefined,
-            scale_max: undefined,
-            scale_width: 20,
-            scale_format: undefined,
-            /**
-             * The padding for color scale element
-             * @name padding
-             * @memberof plugin-stanford
-             * @type {object}
-             * @property {object} [padding] padding object
-             * @property {number} [padding.top=0] Top padding value.
-             * @property {number} [padding.right=0] Right padding value.
-             * @property {number} [padding.bottom=0] Bottom padding value.
-             * @property {number} [padding.left=0] Left padding value.
-             * @example
-             *  padding: {
-             *     top: 15,
-             *     right: 0,
-             *     bottom: 0,
-             *     left: 0
-             *  },
-             */
-            padding_top: 0,
-            padding_right: 0,
-            padding_bottom: 0,
-            padding_left: 0,
-            /**
-             * Show additional regions anywhere on the chart.
-             * - Each region object should consist with following options:
-             *
-             *   | Key | Type | Default | Attributes | Description |
-             *   | --- | --- | --- | --- | --- |
-             *   | points | Array |  | | Accepts a group of objects that has x and y.<br>These points should be added in a counter-clockwise fashion to make a closed polygon. |
-             *   | opacity | Number | `0.2` | &lt;optional> | Sets the opacity of the region as value between 0 and 1 |
-             *   | text | Function |  | &lt;optional> | This function receives a value and percentage of the number of epochs in this region.<br>Return a string to place text in the middle of the region. |
-             *   | class | String | | &lt;optional> | Se a custom css class to this region, use the fill property in css to set a background color. |
-             * @name regions
-             * @memberof plugin-stanford
-             * @type {Array}
-             * @default []
-             * @example
-             *   regions: [
-             *       {
-             *           points: [ // add points counter-clockwise
-             *               { x: 0, y: 0 },
-             *               { x: 40, y: 40 },
-             *               { x: 0, y: 40 },
-             *           ],
-             *           text: function (value, percentage) {
-             *               return `Normal Operations: ${value} (${percentage}%)`;
-             *           },
-             *           opacity: 0.2, // 0 to 1
-             *           class: "test-polygon1"
-             *       },
-             *       ...
-             *   ]
-             */
-            regions: []
-        };
-    }
-    return Options;
+    /**
+     * Load plugin config from options
+     * @private
+     */
+    Plugin.prototype.loadConfig = function () {
+        loadConfig.call(this, this.options);
+    };
+    /**
+     * Lifecycle hook for 'beforeInit' phase.
+     * @private
+     */
+    Plugin.prototype.$beforeInit = function () { };
+    /**
+     * Lifecycle hook for 'init' phase.
+     * @private
+     */
+    Plugin.prototype.$init = function () { };
+    /**
+     * Lifecycle hook for 'afterInit' phase.
+     * @private
+     */
+    Plugin.prototype.$afterInit = function () { };
+    /**
+     * Lifecycle hook for 'redraw' phase.
+     * @private
+     */
+    Plugin.prototype.$redraw = function () { };
+    /**
+     * Lifecycle hook for 'willDestroy' phase.
+     * @private
+     */
+    Plugin.prototype.$willDestroy = function () {
+        var _this = this;
+        Object.keys(this).forEach(function (key) {
+            _this[key] = null;
+            delete _this[key];
+        });
+    };
+    Plugin.version = "3.18.0-nightly-20260314005324";
+    return Plugin;
 }());
-var Options$1 = Options;
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
@@ -780,138 +562,16 @@ function getCentroid(points) {
  * billboard.js project is licensed under the MIT license
  */
 /**
- * Stanford diagram plugin element class
- * @class ColorScale
- * @param {Stanford} owner Stanford instance
- * @private
+ * Simple number formatter.
+ * Supports "d" specifier (decimal notation, rounded to integer).
+ * @param {string} specifier Format specifier
+ * @returns {function} Formatter function
  */
-var Elements = /** @class */ (function () {
-    function Elements(owner) {
-        this.owner = owner;
-        // MEMO: Avoid blocking eventRect
-        var elements = owner.$$.$el.main.select(".bb-chart")
-            .append("g")
-            .attr("class", CLASS.stanfordElements);
-        elements.append("g").attr("class", CLASS.stanfordLines);
-        elements.append("g").attr("class", CLASS.stanfordRegions);
+function format(specifier) {
+    {
+        return function (n) { return Math.round(n).toString(); };
     }
-    Elements.prototype.updateStanfordLines = function (duration) {
-        var $$ = this.owner.$$;
-        var config = $$.config, main = $$.$el.main;
-        var isRotated = config.axis_rotated;
-        var xvCustom = this.xvCustom.bind($$);
-        var yvCustom = this.yvCustom.bind($$);
-        // Stanford-Lines
-        var stanfordLine = main.select(".".concat(CLASS.stanfordLines))
-            .style("shape-rendering", "geometricprecision")
-            .selectAll(".".concat(CLASS.stanfordLine))
-            .data(this.owner.config.lines);
-        // exit
-        stanfordLine.exit().transition()
-            .duration(duration)
-            .style("opacity", "0")
-            .remove();
-        // enter
-        var stanfordLineEnter = stanfordLine.enter().append("g");
-        stanfordLineEnter.append("line")
-            .style("opacity", "0");
-        stanfordLineEnter
-            .merge(stanfordLine)
-            .attr("class", function (d) { return CLASS.stanfordLine + (d["class"] ? " ".concat(d["class"]) : ""); })
-            .select("line")
-            .transition()
-            .duration(duration)
-            .attr("x1", function (d) { return (isRotated ? yvCustom(d, "y1") : xvCustom(d, "x1")); })
-            .attr("x2", function (d) { return (isRotated ? yvCustom(d, "y2") : xvCustom(d, "x2")); })
-            .attr("y1", function (d) { return (isRotated ? xvCustom(d, "x1") : yvCustom(d, "y1")); })
-            .attr("y2", function (d) { return (isRotated ? xvCustom(d, "x2") : yvCustom(d, "y2")); })
-            .transition()
-            .style("opacity", null);
-    };
-    Elements.prototype.updateStanfordRegions = function (duration) {
-        var $$ = this.owner.$$;
-        var config = $$.config, main = $$.$el.main;
-        var isRotated = config.axis_rotated;
-        var xvCustom = this.xvCustom.bind($$);
-        var yvCustom = this.yvCustom.bind($$);
-        var countPointsInRegion = this.owner.countEpochsInRegion.bind($$);
-        // Stanford-Regions
-        var stanfordRegion = main.select(".".concat(CLASS.stanfordRegions))
-            .selectAll(".".concat(CLASS.stanfordRegion))
-            .data(this.owner.config.regions);
-        // exit
-        stanfordRegion.exit().transition()
-            .duration(duration)
-            .style("opacity", "0")
-            .remove();
-        // enter
-        var stanfordRegionEnter = stanfordRegion.enter().append("g");
-        stanfordRegionEnter.append("polygon")
-            .style("opacity", "0");
-        stanfordRegionEnter.append("text")
-            .attr("transform", isRotated ? "rotate(-90)" : "")
-            .style("opacity", "0");
-        stanfordRegion = stanfordRegionEnter.merge(stanfordRegion);
-        // update
-        stanfordRegion
-            .attr("class", function (d) { return CLASS.stanfordRegion + (d["class"] ? " ".concat(d["class"]) : ""); })
-            .select("polygon")
-            .transition()
-            .duration(duration)
-            .attr("points", function (d) { return d.points.map(function (value) { return [
-            isRotated ? yvCustom(value, "y") : xvCustom(value, "x"),
-            isRotated ? xvCustom(value, "x") : yvCustom(value, "y")
-        ].join(","); }).join(" "); })
-            .transition()
-            .style("opacity", function (d) { return String(d.opacity ? d.opacity : 0.2); });
-        stanfordRegion.select("text")
-            .transition()
-            .duration(duration)
-            .attr("x", function (d) { return (isRotated ? yvCustom(getCentroid(d.points), "y") : xvCustom(getCentroid(d.points), "x")); })
-            .attr("y", function (d) { return (isRotated ? xvCustom(getCentroid(d.points), "x") : yvCustom(getCentroid(d.points), "y")); })
-            .text(function (d) {
-            if (d.text) {
-                var _a = countPointsInRegion(d.points), value = _a.value, percentage = _a.percentage;
-                return d.text(value, percentage);
-            }
-            return "";
-        })
-            .attr("text-anchor", "middle")
-            .attr("dominant-baseline", "middle")
-            .transition()
-            .style("opacity", null);
-    };
-    Elements.prototype.updateStanfordElements = function (duration) {
-        if (duration === void 0) { duration = 0; }
-        this.updateStanfordLines(duration);
-        this.updateStanfordRegions(duration);
-    };
-    Elements.prototype.xvCustom = function (d, xyValue) {
-        var $$ = this;
-        var axis = $$.axis, config = $$.config;
-        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
-        if (axis.isTimeSeries()) {
-            value = parseDate.call($$, value);
-        }
-        else if (axis.isCategorized() && isString(value)) {
-            value = config.axis_x_categories.indexOf(d.value);
-        }
-        return Math.ceil($$.scale.x(value));
-    };
-    Elements.prototype.yvCustom = function (d, xyValue) {
-        var $$ = this;
-        var yScale = d.axis && d.axis === "y2" ? $$.scale.y2 : $$.scale.y;
-        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
-        return Math.ceil(yScale(value));
-    };
-    return Elements;
-}());
-var Elements$1 = Elements;
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
+}
 /**
  * Stanford diagram plugin color scale class
  * @class ColorScale
@@ -950,7 +610,7 @@ var ColorScale = /** @class */ (function () {
             .attr("height", barHeight)
             .attr("fill", function (d) { return inverseScale(d); });
         // Legend Axis
-        var axisScale = scaleLog()
+        var axisScale = scaleSymlog()
             .domain([target.minEpochs, target.maxEpochs])
             .range([
             points[0] + config.padding_top + points[points.length - 1] + barHeight - 1,
@@ -965,7 +625,7 @@ var ColorScale = /** @class */ (function () {
             legendAxis.tickFormat(scaleFormat);
         }
         else {
-            legendAxis.tickFormat(format("d"));
+            legendAxis.tickFormat(format());
         }
         // Draw Axis
         var axis = this.colorScale.append("g")
@@ -992,8 +652,317 @@ var ColorScale = /** @class */ (function () {
     };
     return ColorScale;
 }());
-var ColorScale$1 = ColorScale;
 
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
+// @ts-nocheck
+/**
+ * Stanford diagram plugin element class
+ * @class ColorScale
+ * @param {Stanford} owner Stanford instance
+ * @private
+ */
+var Elements = /** @class */ (function () {
+    function Elements(owner) {
+        this.owner = owner;
+        // MEMO: Avoid blocking eventRect
+        var elements = owner.$$.$el.main.select(".bb-chart")
+            .append("g")
+            .attr("class", CLASS.stanfordElements);
+        elements.append("g").attr("class", CLASS.stanfordLines);
+        elements.append("g").attr("class", CLASS.stanfordRegions);
+    }
+    Elements.prototype.updateStanfordLines = function (duration) {
+        var $$ = this.owner.$$;
+        var config = $$.config, main = $$.$el.main;
+        var isRotated = config.axis_rotated;
+        var xvCustom = this.xvCustom.bind($$);
+        var yvCustom = this.yvCustom.bind($$);
+        // Stanford-Lines
+        var stanfordLine = main.select(".".concat(CLASS.stanfordLines))
+            .style("shape-rendering", "geometricprecision")
+            .selectAll(".".concat(CLASS.stanfordLine))
+            .data(this.owner.config.lines);
+        // exit
+        stanfordLine.exit().transition()
+            .duration(duration)
+            .style("opacity", "0")
+            .remove();
+        // enter
+        var stanfordLineEnter = stanfordLine.enter().append("g");
+        stanfordLineEnter.append("line")
+            .style("opacity", "0");
+        stanfordLineEnter
+            .merge(stanfordLine)
+            .attr("class", function (d) { return CLASS.stanfordLine + (d.class ? " ".concat(d.class) : ""); })
+            .select("line")
+            .transition()
+            .duration(duration)
+            .attr("x1", function (d) {
+            var v = isRotated ? yvCustom(d, "y1") : xvCustom(d, "x1");
+            return v;
+        })
+            .attr("x2", function (d) { return (isRotated ? yvCustom(d, "y2") : xvCustom(d, "x2")); })
+            .attr("y1", function (d) {
+            var v = isRotated ? xvCustom(d, "x1") : yvCustom(d, "y1");
+            return v;
+        })
+            .attr("y2", function (d) { return (isRotated ? xvCustom(d, "x2") : yvCustom(d, "y2")); })
+            .transition()
+            .style("opacity", null);
+    };
+    Elements.prototype.updateStanfordRegions = function (duration) {
+        var $$ = this.owner.$$;
+        var config = $$.config, main = $$.$el.main;
+        var isRotated = config.axis_rotated;
+        var xvCustom = this.xvCustom.bind($$);
+        var yvCustom = this.yvCustom.bind($$);
+        var countPointsInRegion = this.owner.countEpochsInRegion.bind($$);
+        // Stanford-Regions
+        var stanfordRegion = main.select(".".concat(CLASS.stanfordRegions))
+            .selectAll(".".concat(CLASS.stanfordRegion))
+            .data(this.owner.config.regions);
+        // exit
+        stanfordRegion.exit().transition()
+            .duration(duration)
+            .style("opacity", "0")
+            .remove();
+        // enter
+        var stanfordRegionEnter = stanfordRegion.enter().append("g");
+        stanfordRegionEnter.append("polygon")
+            .style("opacity", "0");
+        stanfordRegionEnter.append("text")
+            .attr("transform", isRotated ? "rotate(-90)" : "")
+            .style("opacity", "0");
+        stanfordRegion = stanfordRegionEnter.merge(stanfordRegion);
+        // update
+        stanfordRegion
+            .attr("class", function (d) { return CLASS.stanfordRegion + (d.class ? " ".concat(d.class) : ""); })
+            .select("polygon")
+            .transition()
+            .duration(duration)
+            .attr("points", function (d) {
+            return d.points.map(function (value) {
+                return [
+                    isRotated ? yvCustom(value, "y") : xvCustom(value, "x"),
+                    isRotated ? xvCustom(value, "x") : yvCustom(value, "y")
+                ].join(",");
+            }).join(" ");
+        })
+            .transition()
+            .style("opacity", function (d) { return String(d.opacity ? d.opacity : 0.2); });
+        stanfordRegion.select("text")
+            .transition()
+            .duration(duration)
+            .attr("x", function (d) { return (isRotated ?
+            yvCustom(getCentroid(d.points), "y") :
+            xvCustom(getCentroid(d.points), "x")); })
+            .attr("y", function (d) { return (isRotated ?
+            xvCustom(getCentroid(d.points), "x") :
+            yvCustom(getCentroid(d.points), "y")); })
+            .text(function (d) {
+            if (d.text) {
+                var _a = countPointsInRegion(d.points), value = _a.value, percentage = _a.percentage;
+                return d.text(value, percentage);
+            }
+            return "";
+        })
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "middle")
+            .transition()
+            .style("opacity", null);
+    };
+    Elements.prototype.updateStanfordElements = function (duration) {
+        if (duration === void 0) { duration = 0; }
+        this.updateStanfordLines(duration);
+        this.updateStanfordRegions(duration);
+    };
+    Elements.prototype.xvCustom = function (d, xyValue) {
+        var $$ = this;
+        var axis = $$.axis, config = $$.config;
+        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
+        if (axis.isTimeSeries()) {
+            value = parseDate.call($$, value);
+        }
+        else if (axis.isCategorized() && isString(value)) {
+            value = config.axis_x_categories.indexOf(d.value);
+        }
+        return $$.scale.x(value);
+    };
+    Elements.prototype.yvCustom = function (d, xyValue) {
+        var $$ = this;
+        var yScale = d.axis && d.axis === "y2" ? $$.scale.y2 : $$.scale.y;
+        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
+        return yScale(value);
+    };
+    return Elements;
+}());
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
+/**
+ * Stanford diagram plugin option class
+ * @class StanfordOptions
+ * @param {Options} options Stanford plugin options
+ * @augments Plugin
+ * @returns {StanfordOptions}
+ * @private
+ */
+var Options = /** @class */ (function () {
+    function Options() {
+        return {
+            /**
+             * Set the color of the color scale. This function receives a value between 0 and 1, and should return a color.
+             * @name colors
+             * @memberof plugin-stanford
+             * @type {function}
+             * @default undefined
+             * @example
+             *   colors: d3.interpolateHslLong(
+             *      d3.hsl(250, 1, 0.5), d3.hsl(0, 1, 0.5)
+             *   )
+             */
+            colors: undefined,
+            /**
+             * Specify the key of epochs values in the data.
+             * @name epochs
+             * @memberof plugin-stanford
+             * @type {Array}
+             * @default []
+             * @example
+             * 	epochs: [ 1, 1, 2, 2, ... ]
+             */
+            epochs: [],
+            /**
+             * Show additional lines anywhere on the chart.
+             * - Each line object should consist with following options:
+             *
+             * | Key | Type | Description |
+             * | --- | --- | --- |
+             * | x1 | Number | Starting position on the x axis |
+             * | y1 | Number | Starting position on the y axis |
+             * | x2 | Number | Ending position on the x axis  |
+             * | y2 | Number | Ending position on the y axis |
+             * | class | String | Optional value. Set a custom css class to this line. |
+             * @type {Array}
+             * @memberof plugin-stanford
+             * @default []
+             * @example
+             *   lines: [
+             *       { x1: 0, y1: 0, x2: 65, y2: 65, class: "line1" },
+             *       { x1: 0, x2: 65, y1: 40, y2: 40, class: "line2" }
+             *   ]
+             */
+            lines: [],
+            /**
+             * Set scale values
+             * @name scale
+             * @memberof plugin-stanford
+             * @type {object}
+             * @property {object} [scale] scale object
+             * @property {number} [scale.min=undefined] Minimum value of the color scale. Default: lowest value in epochs
+             * @property {number} [scale.max=undefined] Maximum value of the color scale. Default: highest value in epochs
+             * @property {number} [scale.width=20] Width of the color scale
+             * @property {string|function} [scale.format=undefined] Format of the axis of the color scale. Use 'pow10' to format as powers of 10 or a custom function. Example: d3.format("d")
+             * @example
+             *  scale: {
+             *    max: 10000,
+             *    min: 1,
+             *    width: 500,
+             *
+             *    // specify 'pow10' to format as powers of 10
+             *    format: "pow10",
+             *
+             *    // or specify a format function
+             *    format: function(x) {
+             *    	return x +"%";
+             *    }
+             *  },
+             */
+            scale_min: undefined,
+            scale_max: undefined,
+            scale_width: 20,
+            scale_format: undefined,
+            /**
+             * The padding for color scale element
+             * @name padding
+             * @memberof plugin-stanford
+             * @type {object}
+             * @property {object} [padding] padding object
+             * @property {number} [padding.top=0] Top padding value.
+             * @property {number} [padding.right=0] Right padding value.
+             * @property {number} [padding.bottom=0] Bottom padding value.
+             * @property {number} [padding.left=0] Left padding value.
+             * @example
+             *  padding: {
+             *     top: 15,
+             *     right: 0,
+             *     bottom: 0,
+             *     left: 0
+             *  },
+             */
+            padding_top: 0,
+            padding_right: 0,
+            padding_bottom: 0,
+            padding_left: 0,
+            /**
+             * Show additional regions anywhere on the chart.
+             * - Each region object should consist with following options:
+             *
+             *   | Key | Type | Default | Attributes | Description |
+             *   | --- | --- | --- | --- | --- |
+             *   | points | Array |  | | Accepts a group of objects that has x and y.<br>These points should be added in a counter-clockwise fashion to make a closed polygon. |
+             *   | opacity | Number | `0.2` | &lt;optional> | Sets the opacity of the region as value between 0 and 1 |
+             *   | text | Function |  | &lt;optional> | This function receives a value and percentage of the number of epochs in this region.<br>Return a string to place text in the middle of the region. |
+             *   | class | String | | &lt;optional> | Se a custom css class to this region, use the fill property in css to set a background color. |
+             * @name regions
+             * @memberof plugin-stanford
+             * @type {Array}
+             * @default []
+             * @example
+             *   regions: [
+             *       {
+             *           points: [ // add points counter-clockwise
+             *               { x: 0, y: 0 },
+             *               { x: 40, y: 40 },
+             *               { x: 0, y: 40 },
+             *           ],
+             *           text: function (value, percentage) {
+             *               return `Normal Operations: ${value} (${percentage}%)`;
+             *           },
+             *           opacity: 0.2, // 0 to 1
+             *           class: "test-polygon1"
+             *       },
+             *       ...
+             *   ]
+             */
+            regions: []
+        };
+    }
+    return Options;
+}());
+
+/**
+ * Creates an HSL color object.
+ * @param {number} h Hue (0-360)
+ * @param {number} s Saturation (0-1)
+ * @param {number} l Lightness (0-1)
+ * @param {number} opacity Opacity (0-1), defaults to 1
+ * @returns {HSLColor} HSL color object
+ */
+function hsl(h, s, l, opacity) {
+    if (opacity === void 0) { opacity = 1; }
+    return {
+        h: +h,
+        s: 1,
+        l: 0.5,
+        opacity: +opacity
+    };
+}
 /**
  * Stanford diagram plugin
  * - **NOTE:**
@@ -1003,19 +972,15 @@ var ColorScale$1 = ColorScale;
  * - **Required modules:**
  *   - [d3-selection](https://github.com/d3/d3-selection)
  *   - [d3-interpolate](https://github.com/d3/d3-interpolate)
- *   - [d3-color](https://github.com/d3/d3-color)
  *   - [d3-scale](https://github.com/d3/d3-scale)
  *   - [d3-brush](https://github.com/d3/d3-brush)
  *   - [d3-axis](https://github.com/d3/d3-axis)
- *   - [d3-format](https://github.com/d3/d3-format)
  * @class plugin-stanford
  * @requires d3-selection
  * @requires d3-interpolate
- * @requires d3-color
  * @requires d3-scale
  * @requires d3-brush
  * @requires d3-axis
- * @requires d3-format
  * @param {object} options Stanford plugin options
  * @augments Plugin
  * @returns {Stanford}
@@ -1070,7 +1035,7 @@ var ColorScale$1 = ColorScale;
  *     ]
  *  });
  * @example
- *	import {bb} from "billboard.js";
+ * 	import {bb} from "billboard.js";
  * import Stanford from "billboard.js/dist/billboardjs-plugin-stanford";
  *
  * bb.generate({
@@ -1083,7 +1048,7 @@ var Stanford = /** @class */ (function (_super) {
     __extends(Stanford, _super);
     function Stanford(options) {
         var _this = _super.call(this, options) || this;
-        _this.config = new Options$1();
+        _this.config = new Options();
         return _this;
     }
     Stanford.prototype.$beforeInit = function () {
@@ -1095,19 +1060,24 @@ var Stanford = /** @class */ (function (_super) {
         $$.showGridFocus = function () { };
         $$.labelishData = function (d) { return d.values; };
         $$.opacityForCircle = function () { return 1; };
-        var getCurrentPaddingRight = $$.getCurrentPaddingRight.bind($$);
-        $$.getCurrentPaddingRight = function () { return (getCurrentPaddingRight() + (_this.colorScale ? _this.colorScale.getColorScalePadding() : 0)); };
+        var getCurrentPadding = $$.getCurrentPadding.bind($$);
+        $$.getCurrentPadding = function () {
+            var padding = getCurrentPadding();
+            padding.right += _this.colorScale ? _this.colorScale.getColorScalePadding() : 0;
+            return padding;
+        };
     };
     Stanford.prototype.$init = function () {
         var $$ = this.$$;
-        loadConfig.call(this, this.options);
+        this.loadConfig();
         $$.color = this.getStanfordPointColor.bind($$);
-        this.colorScale = new ColorScale$1(this);
-        this.elements = new Elements$1(this);
+        this.colorScale = new ColorScale(this);
+        this.elements = new Elements(this);
         this.convertData();
         this.initStanfordData();
         this.setStanfordTooltip();
         this.colorScale.drawColorScale();
+        $$.right += this.colorScale ? this.colorScale.getColorScalePadding() : 0;
         this.$redraw();
     };
     Stanford.prototype.$redraw = function (duration) {
@@ -1116,7 +1086,7 @@ var Stanford = /** @class */ (function (_super) {
         (_b = this.elements) === null || _b === void 0 ? void 0 : _b.updateStanfordElements(duration);
     };
     Stanford.prototype.getOptions = function () {
-        return new Options$1();
+        return new Options();
     };
     Stanford.prototype.convertData = function () {
         var data = this.$$.data.targets;
@@ -1131,25 +1101,6 @@ var Stanford = /** @class */ (function (_super) {
             d.colorscale = undefined;
         });
     };
-    Stanford.prototype.xvCustom = function (d, xyValue) {
-        var $$ = this;
-        var axis = $$.axis, config = $$.config;
-        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
-        if (axis.isTimeSeries()) {
-            value = parseDate.call($$, value);
-        }
-        else if (axis.isCategorized() && isString(value)) {
-            value = config.axis_x_categories.indexOf(d.value);
-        }
-        return Math.ceil($$.scale.x(value));
-    };
-    Stanford.prototype.yvCustom = function (d, xyValue) {
-        var $$ = this;
-        var scale = $$.scale;
-        var yScale = d.axis && d.axis === "y2" ? scale.y2 : scale.y;
-        var value = xyValue ? d[xyValue] : $$.getBaseValue(d);
-        return Math.ceil(yScale(value));
-    };
     Stanford.prototype.initStanfordData = function () {
         var config = this.config;
         var target = this.$$.data.targets[0];
@@ -1161,7 +1112,8 @@ var Stanford = /** @class */ (function (_super) {
         target.minEpochs = !isNaN(config.scale_min) ? config.scale_min : Math.min.apply(Math, epochs);
         target.maxEpochs = !isNaN(config.scale_max) ? config.scale_max : Math.max.apply(Math, epochs);
         target.colors = isFunction(config.colors) ?
-            config.colors : interpolateHslLong(hsl(250, 1, 0.5), hsl(0, 1, 0.5));
+            config.colors :
+            interpolateHslLong(hsl(250), hsl(0));
         target.colorscale = scaleSequentialLog(target.colors)
             .domain([target.minEpochs, target.maxEpochs]);
     };
@@ -1173,9 +1125,11 @@ var Stanford = /** @class */ (function (_super) {
         var config = this.$$.config;
         if (isEmpty(config.tooltip_contents)) {
             config.tooltip_contents = function (d, defaultTitleFormat, defaultValueFormat, color) {
+                var data_x = config.data_x;
                 var html = "<table class=\"".concat($TOOLTIP.tooltip, "\"><tbody>");
                 d.forEach(function (v) {
-                    html += "<tr>\n\t\t\t\t\t\t\t<th>".concat(defaultTitleFormat(config.data_x), "</th>\n\t\t\t\t\t\t\t<th class=\"value\">").concat(defaultValueFormat(v.x), "</th>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<th>").concat(defaultTitleFormat(v.id), "</th>\n\t\t\t\t\t\t\t<th class=\"value\">").concat(defaultValueFormat(v.value), "</th>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr class=\"").concat($TOOLTIP.tooltipName, "-").concat(v.id, "\">\n\t\t\t\t\t\t\t<td class=\"name\"><span style=\"background-color:").concat(color(v), "\"></span>").concat(defaultTitleFormat("Epochs"), "</td>\n\t\t\t\t\t\t\t<td class=\"value\">").concat(defaultValueFormat(v.epochs), "</td>\n\t\t\t\t\t\t</tr>");
+                    var _a = v.id, id = _a === void 0 ? "" : _a, _b = v.value, value = _b === void 0 ? 0 : _b, _c = v.epochs, epochs = _c === void 0 ? 0 : _c, _d = v.x, x = _d === void 0 ? "" : _d;
+                    html += "<tr>\n\t\t\t\t\t\t\t<th>".concat(data_x || "", "</th>\n\t\t\t\t\t\t\t<th class=\"value\">").concat(defaultTitleFormat(x), "</th>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<th>").concat(v.id, "</th>\n\t\t\t\t\t\t\t<th class=\"value\">").concat(defaultValueFormat(value), "</th>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr class=\"").concat($TOOLTIP.tooltipName, "-").concat(id, "\">\n\t\t\t\t\t\t\t<td class=\"name\"><span style=\"background-color:").concat(color(v), "\"></span>Epochs</td>\n\t\t\t\t\t\t\t<td class=\"value\">").concat(defaultValueFormat(epochs), "</td>\n\t\t\t\t\t\t</tr>");
                 });
                 return "".concat(html, "</tbody></table>");
             };
@@ -1184,9 +1138,7 @@ var Stanford = /** @class */ (function (_super) {
     Stanford.prototype.countEpochsInRegion = function (region) {
         var $$ = this;
         var target = $$.data.targets[0];
-        var total = target.values.reduce(function (accumulator, currentValue) {
-            return accumulator + Number(currentValue.epochs);
-        }, 0);
+        var total = target.values.reduce(function (accumulator, currentValue) { return accumulator + Number(currentValue.epochs); }, 0);
         var value = target.values.reduce(function (accumulator, currentValue) {
             if (pointInRegion(currentValue, region)) {
                 return accumulator + Number(currentValue.epochs);

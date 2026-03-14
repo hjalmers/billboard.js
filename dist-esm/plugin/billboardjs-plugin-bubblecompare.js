@@ -5,13 +5,13 @@
  * billboard.js, JavaScript chart library
  * https://naver.github.io/billboard.js/
  * 
- * @version 3.3.3-nightly-20220303005130
+ * @version 3.18.0-nightly-20260314005324
  * @requires billboard.js
  * @summary billboard.js plugin
 */
 import { select } from 'd3-selection';
 
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -25,44 +25,124 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
-/* global Reflect, Promise */
-var _extendStatics = function extendStatics(d, b) {
-  _extendStatics = Object.setPrototypeOf || {
-    __proto__: []
-  } instanceof Array && function (d, b) {
-    d.__proto__ = b;
-  } || function (d, b) {
-    for (var p in b) {
-      if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
-    }
-  };
-
-  return _extendStatics(d, b);
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
 };
 
 function __extends(d, b) {
-  if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + (b + "") + " is not a constructor or null");
-
-  _extendStatics(d, b);
-
-  function __() {
-    this.constructor = d;
-  }
-
-  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
+/**
+ * Window object
+ * @private
+ */
+/* eslint-disable no-new-func, no-undef */
+/**
+ * Get global object
+ * @returns {object} window object
+ * @private
+ */
+function getGlobal() {
+    return (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object &&
+        globalThis) ||
+        (typeof global === "object" && global !== null && global.Object === Object && global) ||
+        (typeof self === "object" && self !== null && self.Object === Object && self) ||
+        Function("return this")();
+}
+var win = getGlobal();
+var doc = win === null || win === void 0 ? void 0 : win.document;
 
+var isDefined = function (v) { return typeof v !== "undefined"; };
+var isObjectType = function (v) { return typeof v === "object"; };
+// emulate event
+({
+    mouse: (function () {
+        var getParams = function () { return ({
+            bubbles: false,
+            cancelable: false,
+            screenX: 0,
+            screenY: 0,
+            clientX: 0,
+            clientY: 0
+        }); };
+        try {
+            // eslint-disable-next-line no-new
+            new MouseEvent("t");
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                el.dispatchEvent(new MouseEvent(eventType, params));
+            };
+        }
+        catch (_a) {
+            // Polyfills DOM4 MouseEvent
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                var mouseEvent = doc.createEvent("MouseEvent");
+                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/initMouseEvent
+                mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, win, 0, // the event's mouse click count
+                params.screenX, params.screenY, params.clientX, params.clientY, false, false, false, false, 0, null);
+                el.dispatchEvent(mouseEvent);
+            };
+        }
+    })()});
+
+/**
+ * Load configuration option
+ * @param {object} config User's generation config value
+ * @private
+ */
+function loadConfig(config) {
+    var thisConfig = this.config;
+    var target;
+    var keys;
+    var read;
+    var find = function () {
+        var key = keys.shift();
+        if (key && target && isObjectType(target) && key in target) {
+            target = target[key];
+            return find();
+        }
+        else if (!key) {
+            return target;
+        }
+        return undefined;
+    };
+    Object.keys(thisConfig).forEach(function (key) {
+        target = config;
+        keys = key.split("_");
+        read = find();
+        if (isDefined(read)) {
+            thisConfig[key] = read;
+        }
+    });
+    // only should run in the ChartInternal context
+    if (this.api) {
+        this.state.orgConfig = config;
+    }
+}
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
 /**
  * Base class to generate billboard.js plugin
  * @class Plugin
  */
-
 /**
  * Version info string for plugin
  * @name version
@@ -72,77 +152,57 @@ function __extends(d, b) {
  * @example
  *   bb.plugin.stanford.version;  // ex) 1.9.0
  */
-var Plugin = /*#__PURE__*/function () {
-  /**
-   * Version info string for plugin
-   * @name version
-   * @static
-   * @memberof Plugin
-   * @type {String}
-   * @example
-   *   bb.plugin.stanford.version;  // ex) 1.9.0
-   */
-
-  /**
-   * Constructor
-   * @param {Any} options config option object
-   * @private
-   */
-  function Plugin(options) {
-    if (options === void 0) {
-      options = {};
+var Plugin = /** @class */ (function () {
+    /**
+     * Constructor
+     * @param {Any} options config option object
+     * @private
+     */
+    function Plugin(options) {
+        if (options === void 0) { options = {}; }
+        this.options = options;
     }
-    this.options = options;
-  }
-  /**
-   * Lifecycle hook for 'beforeInit' phase.
-   * @private
-   */
-
-
-  var _proto = Plugin.prototype;
-
-  _proto.$beforeInit = function $beforeInit() {}
-  /**
-   * Lifecycle hook for 'init' phase.
-   * @private
-   */
-  ;
-
-  _proto.$init = function $init() {}
-  /**
-   * Lifecycle hook for 'afterInit' phase.
-   * @private
-   */
-  ;
-
-  _proto.$afterInit = function $afterInit() {}
-  /**
-   * Lifecycle hook for 'redraw' phase.
-   * @private
-   */
-  ;
-
-  _proto.$redraw = function $redraw() {}
-  /**
-   * Lifecycle hook for 'willDestroy' phase.
-   * @private
-   */
-  ;
-
-  _proto.$willDestroy = function $willDestroy() {
-    var _this = this;
-
-    Object.keys(this).forEach(function (key) {
-      _this[key] = null;
-      delete _this[key];
-    });
-  };
-
-  return Plugin;
-}();
-
-Plugin.version = "#3.3.3-nightly-20220303005130#";
+    /**
+     * Load plugin config from options
+     * @private
+     */
+    Plugin.prototype.loadConfig = function () {
+        loadConfig.call(this, this.options);
+    };
+    /**
+     * Lifecycle hook for 'beforeInit' phase.
+     * @private
+     */
+    Plugin.prototype.$beforeInit = function () { };
+    /**
+     * Lifecycle hook for 'init' phase.
+     * @private
+     */
+    Plugin.prototype.$init = function () { };
+    /**
+     * Lifecycle hook for 'afterInit' phase.
+     * @private
+     */
+    Plugin.prototype.$afterInit = function () { };
+    /**
+     * Lifecycle hook for 'redraw' phase.
+     * @private
+     */
+    Plugin.prototype.$redraw = function () { };
+    /**
+     * Lifecycle hook for 'willDestroy' phase.
+     * @private
+     */
+    Plugin.prototype.$willDestroy = function () {
+        var _this = this;
+        Object.keys(this).forEach(function (key) {
+            _this[key] = null;
+            delete _this[key];
+        });
+    };
+    Plugin.version = "3.18.0-nightly-20260314005324";
+    return Plugin;
+}());
 
 /**
  * Bubble compare diagram plugin.<br>
@@ -208,7 +268,7 @@ var BubbleCompare = /** @class */ (function (_super) {
         d.raise && select(d.node().parentNode.parentNode).raise();
     };
     BubbleCompare.prototype.changeCursorPoint = function () {
-        this.$$.$el.svg.select(".bb-event-rect").style("cursor", "pointer");
+        this.$$.$el.eventRect.style("cursor", "pointer");
     };
     BubbleCompare.prototype.findClosest = function (values, pos) {
         var _this = this;
@@ -235,9 +295,7 @@ var BubbleCompare = /** @class */ (function (_super) {
         return Math.abs(size) * (maxR - minR) + minR;
     };
     BubbleCompare.prototype.getZData = function (d) {
-        return this.$$.isBubbleZType(d) ?
-            this.$$.getBubbleZData(d.value, "z") :
-            d.value;
+        return this.$$.isBubbleZType(d) ? this.$$.getBubbleZData(d.value, "z") : d.value;
     };
     BubbleCompare.version = "0.0.1";
     return BubbleCompare;

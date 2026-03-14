@@ -5,11 +5,11 @@
  * billboard.js, JavaScript chart library
  * https://naver.github.io/billboard.js/
  * 
- * @version 3.3.3-nightly-20220303005130
+ * @version 3.18.0-nightly-20260314005324
  * @requires billboard.js
  * @summary billboard.js plugin
 */
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -23,58 +23,33 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
-/* global Reflect, Promise */
-var _extendStatics = function extendStatics(d, b) {
-  _extendStatics = Object.setPrototypeOf || {
-    __proto__: []
-  } instanceof Array && function (d, b) {
-    d.__proto__ = b;
-  } || function (d, b) {
-    for (var p in b) {
-      if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
-    }
-  };
-
-  return _extendStatics(d, b);
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
 };
 
 function __extends(d, b) {
-  if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + (b + "") + " is not a constructor or null");
-
-  _extendStatics(d, b);
-
-  function __() {
-    this.constructor = d;
-  }
-
-  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
 
-var _assign = function __assign() {
-  _assign = Object.assign || function (t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-      s = arguments[i];
-
-      for (var p in s) {
-        if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
-      }
-    }
-
-    return t;
-  };
-
-  return _assign.apply(this, arguments);
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
 };
-function __spreadArray(to, from, pack) {
-  if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-    if (ar || !(i in from)) {
-      if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-      ar[i] = from[i];
-    }
-  }
-  return to.concat(ar || Array.prototype.slice.call(from));
-}
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
@@ -90,16 +65,20 @@ var $COMMON = {
     empty: "bb-empty",
     main: "bb-main",
     target: "bb-target",
-    EXPANDED: "_expanded_"
+    EXPANDED: "_expanded_",
+    dummy: "_dummy_"
 };
 var $ARC = {
     arc: "bb-arc",
     arcLabelLine: "bb-arc-label-line",
+    arcLabelLineText: "bb-arc-label-line-text",
+    arcRange: "bb-arc-range",
     arcs: "bb-arcs",
     chartArc: "bb-chart-arc",
     chartArcs: "bb-chart-arcs",
     chartArcsBackground: "bb-chart-arcs-background",
-    chartArcsTitle: "bb-chart-arcs-title"
+    chartArcsTitle: "bb-chart-arcs-title",
+    needle: "bb-needle"
 };
 var $AREA = {
     area: "bb-area",
@@ -112,13 +91,19 @@ var $AXIS = {
     axisY: "bb-axis-y",
     axisY2: "bb-axis-y2",
     axisY2Label: "bb-axis-y2-label",
-    axisYLabel: "bb-axis-y-label"
+    axisYLabel: "bb-axis-y-label",
+    axisXTooltip: "bb-axis-x-tooltip",
+    axisYTooltip: "bb-axis-y-tooltip",
+    axisY2Tooltip: "bb-axis-y2-tooltip",
+    axisTooltipX: "bb-axis-tooltip-x",
+    axisTooltipY: "bb-axis-tooltip-y"
 };
 var $BAR = {
     bar: "bb-bar",
     bars: "bb-bars",
     chartBar: "bb-chart-bar",
-    chartBars: "bb-chart-bars"
+    chartBars: "bb-chart-bars",
+    barConnectLine: "bb-bar-connectLine"
 };
 var $CANDLESTICK = {
     candlestick: "bb-candlestick",
@@ -140,6 +125,12 @@ var $COLOR = {
 var $DRAG = {
     dragarea: "bb-dragarea",
     INCLUDED: "_included_"
+};
+var $FUNNEL = {
+    funnel: "bb-funnel",
+    chartFunnel: "bb-chart-funnel",
+    chartFunnels: "bb-chart-funnels",
+    funnelBackground: "bb-funnel-background"
 };
 var $GAUGE = {
     chartArcsGaugeMax: "bb-chart-arcs-gauge-max",
@@ -190,9 +181,7 @@ var $GRID = {
 };
 var $RADAR = {
     chartRadar: "bb-chart-radar",
-    chartRadars: "bb-chart-radars",
-    level: "bb-level",
-    levels: "bb-levels"
+    chartRadars: "bb-chart-radars"
 };
 var $REGION = {
     region: "bb-region",
@@ -217,6 +206,8 @@ var $TEXT = {
     text: "bb-text",
     texts: "bb-texts",
     title: "bb-title",
+    textBorderRect: "bb-text-border",
+    textLabelImage: "bb-text-label-image",
     TextOverlapping: "text-overlapping"
 };
 var $TOOLTIP = {
@@ -224,22 +215,118 @@ var $TOOLTIP = {
     tooltipContainer: "bb-tooltip-container",
     tooltipName: "bb-tooltip-name"
 };
+var $TREEMAP = {
+    treemap: "bb-treemap",
+    chartTreemap: "bb-chart-treemap",
+    chartTreemaps: "bb-chart-treemaps"
+};
 var $ZOOM = {
     buttonZoomReset: "bb-zoom-reset",
     zoomBrush: "bb-zoom-brush"
 };
-_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign({}, $COMMON), $ARC), $AREA), $AXIS), $BAR), $CANDLESTICK), $CIRCLE), $COLOR), $DRAG), $GAUGE), $LEGEND), $LINE), $EVENT), $FOCUS), $GRID), $RADAR), $REGION), $SELECT), $SHAPE), $SUBCHART), $TEXT), $TOOLTIP), $ZOOM);
+__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign(__assign({}, $COMMON), $ARC), $AREA), $AXIS), $BAR), $CANDLESTICK), $CIRCLE), $COLOR), $DRAG), $GAUGE), $LEGEND), $LINE), $EVENT), $FOCUS), $FUNNEL), $GRID), $RADAR), $REGION), $SELECT), $SHAPE), $SUBCHART), $TEXT), $TOOLTIP), $TREEMAP), $ZOOM);
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
+/**
+ * Window object
+ * @private
+ */
+/* eslint-disable no-new-func, no-undef */
+/**
+ * Get global object
+ * @returns {object} window object
+ * @private
+ */
+function getGlobal() {
+    return (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object &&
+        globalThis) ||
+        (typeof global === "object" && global !== null && global.Object === Object && global) ||
+        (typeof self === "object" && self !== null && self.Object === Object && self) ||
+        Function("return this")();
+}
+var win = getGlobal();
+var doc = win === null || win === void 0 ? void 0 : win.document;
 
+var isDefined = function (v) { return typeof v !== "undefined"; };
+var isObjectType = function (v) { return typeof v === "object"; };
+// emulate event
+({
+    mouse: (function () {
+        var getParams = function () { return ({
+            bubbles: false,
+            cancelable: false,
+            screenX: 0,
+            screenY: 0,
+            clientX: 0,
+            clientY: 0
+        }); };
+        try {
+            // eslint-disable-next-line no-new
+            new MouseEvent("t");
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                el.dispatchEvent(new MouseEvent(eventType, params));
+            };
+        }
+        catch (_a) {
+            // Polyfills DOM4 MouseEvent
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                var mouseEvent = doc.createEvent("MouseEvent");
+                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/initMouseEvent
+                mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, win, 0, // the event's mouse click count
+                params.screenX, params.screenY, params.clientX, params.clientY, false, false, false, false, 0, null);
+                el.dispatchEvent(mouseEvent);
+            };
+        }
+    })()});
+
+/**
+ * Load configuration option
+ * @param {object} config User's generation config value
+ * @private
+ */
+function loadConfig(config) {
+    var thisConfig = this.config;
+    var target;
+    var keys;
+    var read;
+    var find = function () {
+        var key = keys.shift();
+        if (key && target && isObjectType(target) && key in target) {
+            target = target[key];
+            return find();
+        }
+        else if (!key) {
+            return target;
+        }
+        return undefined;
+    };
+    Object.keys(thisConfig).forEach(function (key) {
+        target = config;
+        keys = key.split("_");
+        read = find();
+        if (isDefined(read)) {
+            thisConfig[key] = read;
+        }
+    });
+    // only should run in the ChartInternal context
+    if (this.api) {
+        this.state.orgConfig = config;
+    }
+}
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
 /**
  * Base class to generate billboard.js plugin
  * @class Plugin
  */
-
 /**
  * Version info string for plugin
  * @name version
@@ -249,77 +336,57 @@ _assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(_assign(
  * @example
  *   bb.plugin.stanford.version;  // ex) 1.9.0
  */
-var Plugin = /*#__PURE__*/function () {
-  /**
-   * Version info string for plugin
-   * @name version
-   * @static
-   * @memberof Plugin
-   * @type {String}
-   * @example
-   *   bb.plugin.stanford.version;  // ex) 1.9.0
-   */
-
-  /**
-   * Constructor
-   * @param {Any} options config option object
-   * @private
-   */
-  function Plugin(options) {
-    if (options === void 0) {
-      options = {};
+var Plugin = /** @class */ (function () {
+    /**
+     * Constructor
+     * @param {Any} options config option object
+     * @private
+     */
+    function Plugin(options) {
+        if (options === void 0) { options = {}; }
+        this.options = options;
     }
-    this.options = options;
-  }
-  /**
-   * Lifecycle hook for 'beforeInit' phase.
-   * @private
-   */
-
-
-  var _proto = Plugin.prototype;
-
-  _proto.$beforeInit = function $beforeInit() {}
-  /**
-   * Lifecycle hook for 'init' phase.
-   * @private
-   */
-  ;
-
-  _proto.$init = function $init() {}
-  /**
-   * Lifecycle hook for 'afterInit' phase.
-   * @private
-   */
-  ;
-
-  _proto.$afterInit = function $afterInit() {}
-  /**
-   * Lifecycle hook for 'redraw' phase.
-   * @private
-   */
-  ;
-
-  _proto.$redraw = function $redraw() {}
-  /**
-   * Lifecycle hook for 'willDestroy' phase.
-   * @private
-   */
-  ;
-
-  _proto.$willDestroy = function $willDestroy() {
-    var _this = this;
-
-    Object.keys(this).forEach(function (key) {
-      _this[key] = null;
-      delete _this[key];
-    });
-  };
-
-  return Plugin;
-}();
-
-Plugin.version = "#3.3.3-nightly-20220303005130#";
+    /**
+     * Load plugin config from options
+     * @private
+     */
+    Plugin.prototype.loadConfig = function () {
+        loadConfig.call(this, this.options);
+    };
+    /**
+     * Lifecycle hook for 'beforeInit' phase.
+     * @private
+     */
+    Plugin.prototype.$beforeInit = function () { };
+    /**
+     * Lifecycle hook for 'init' phase.
+     * @private
+     */
+    Plugin.prototype.$init = function () { };
+    /**
+     * Lifecycle hook for 'afterInit' phase.
+     * @private
+     */
+    Plugin.prototype.$afterInit = function () { };
+    /**
+     * Lifecycle hook for 'redraw' phase.
+     * @private
+     */
+    Plugin.prototype.$redraw = function () { };
+    /**
+     * Lifecycle hook for 'willDestroy' phase.
+     * @private
+     */
+    Plugin.prototype.$willDestroy = function () {
+        var _this = this;
+        Object.keys(this).forEach(function (key) {
+            _this[key] = null;
+            delete _this[key];
+        });
+    };
+    Plugin.version = "3.18.0-nightly-20260314005324";
+    return Plugin;
+}());
 
 /**
  * Copyright (c) 2021 ~ present NAVER Corp.
@@ -351,151 +418,6 @@ var Options = /** @class */ (function () {
     }
     return Options;
 }());
-var Options$1 = Options;
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-var win = (function () {
-    var root = (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object && globalThis) ||
-        (typeof global === "object" && global !== null && global.Object === Object && global) ||
-        (typeof self === "object" && self !== null && self.Object === Object && self);
-    return root || Function("return this")();
-})();
-/* eslint-enable no-new-func, no-undef */
-// fallback for non-supported environments
-win.requestIdleCallback = win.requestIdleCallback || (function (cb) { return setTimeout(cb, 1); });
-win.cancelIdleCallback = win.cancelIdleCallback || (function (id) { return clearTimeout(id); });
-var doc = win === null || win === void 0 ? void 0 : win.document;
-
-var isDefined = function (v) { return typeof v !== "undefined"; };
-var isObjectType = function (v) { return typeof v === "object"; };
-/**
- * Check if is array
- * @param {Array} arr Data to be checked
- * @returns {boolean}
- * @private
- */
-var isArray = function (arr) { return Array.isArray(arr); };
-/**
- * Check if is object
- * @param {object} obj Data to be checked
- * @returns {boolean}
- * @private
- */
-var isObject = function (obj) { return obj && !(obj === null || obj === void 0 ? void 0 : obj.nodeType) && isObjectType(obj) && !isArray(obj); };
-/**
- * Merge object returning new object
- * @param {object} target Target object
- * @param {object} objectN Source object
- * @returns {object} merged target object
- * @private
- */
-function mergeObj(target) {
-    var objectN = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        objectN[_i - 1] = arguments[_i];
-    }
-    if (!objectN.length || (objectN.length === 1 && !objectN[0])) {
-        return target;
-    }
-    var source = objectN.shift();
-    if (isObject(target) && isObject(source)) {
-        Object.keys(source).forEach(function (key) {
-            var value = source[key];
-            if (isObject(value)) {
-                !target[key] && (target[key] = {});
-                target[key] = mergeObj(target[key], value);
-            }
-            else {
-                target[key] = isArray(value) ?
-                    value.concat() : value;
-            }
-        });
-    }
-    return mergeObj.apply(void 0, __spreadArray([target], objectN, false));
-}
-// emulate event
-({
-    mouse: (function () {
-        var getParams = function () { return ({
-            bubbles: false, cancelable: false, screenX: 0, screenY: 0, clientX: 0, clientY: 0
-        }); };
-        try {
-            // eslint-disable-next-line no-new
-            new MouseEvent("t");
-            return function (el, eventType, params) {
-                if (params === void 0) { params = getParams(); }
-                el.dispatchEvent(new MouseEvent(eventType, params));
-            };
-        }
-        catch (e) {
-            // Polyfills DOM4 MouseEvent
-            return function (el, eventType, params) {
-                if (params === void 0) { params = getParams(); }
-                var mouseEvent = doc.createEvent("MouseEvent");
-                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/initMouseEvent
-                mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, win, 0, // the event's mouse click count
-                params.screenX, params.screenY, params.clientX, params.clientY, false, false, false, false, 0, null);
-                el.dispatchEvent(mouseEvent);
-            };
-        }
-    })(),
-    touch: function (el, eventType, params) {
-        var touchObj = new Touch(mergeObj({
-            identifier: Date.now(),
-            target: el,
-            radiusX: 2.5,
-            radiusY: 2.5,
-            rotationAngle: 10,
-            force: 0.5
-        }, params));
-        el.dispatchEvent(new TouchEvent(eventType, {
-            cancelable: true,
-            bubbles: true,
-            shiftKey: true,
-            touches: [touchObj],
-            targetTouches: [],
-            changedTouches: [touchObj]
-        }));
-    }
-});
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-/**
- * Load configuration option
- * @param {object} config User's generation config value
- * @private
- */
-function loadConfig(config) {
-    var thisConfig = this.config;
-    var target;
-    var keys;
-    var read;
-    var find = function () {
-        var key = keys.shift();
-        if (key && target && isObjectType(target) && key in target) {
-            target = target[key];
-            return find();
-        }
-        else if (!key) {
-            return target;
-        }
-        return undefined;
-    };
-    Object.keys(thisConfig).forEach(function (key) {
-        target = config;
-        keys = key.split("_");
-        read = find();
-        if (isDefined(read)) {
-            thisConfig[key] = read;
-        }
-    });
-}
 
 /**
  * Sparkline plugin.<br>
@@ -546,11 +468,11 @@ var Sparkline = /** @class */ (function (_super) {
     __extends(Sparkline, _super);
     function Sparkline(options) {
         var _this = _super.call(this, options) || this;
-        _this.config = new Options$1();
+        _this.config = new Options();
         return _this;
     }
     Sparkline.prototype.$beforeInit = function () {
-        loadConfig.call(this, this.options);
+        this.loadConfig();
         this.validate();
         this.element = [].slice.call(document.querySelectorAll(this.config.selector));
         // override internal methods
@@ -591,13 +513,21 @@ var Sparkline = /** @class */ (function (_super) {
         config.legend_show = false;
         config.resize_auto = false;
         config.axis_x_show = false;
-        config.axis_x_padding = {
-            left: 15,
-            right: 15,
-            unit: "px"
-        };
+        // set default axes padding
+        if (config.padding !== false) {
+            var hasOption = function (o) { return Object.keys(o || {}).length > 0; };
+            if (hasOption(config.axis_x_padding)) {
+                config.axis_x_padding = {
+                    left: 15,
+                    right: 15,
+                    unit: "px"
+                };
+            }
+            if (hasOption(config.axis_y_padding)) {
+                config.axis_y_padding = 5;
+            }
+        }
         config.axis_y_show = false;
-        config.axis_y_padding = 5;
         if (!config.tooltip_position) {
             config.tooltip_position = function (data, width, height) {
                 var event = this.internal.state.event;
@@ -614,14 +544,14 @@ var Sparkline = /** @class */ (function (_super) {
         }
     };
     Sparkline.prototype.$init = function () {
-        var $$ = this.$$;
-        var $el = $$.$el;
+        var _a;
+        var $el = this.$$.$el;
         // make disable-ish main chart element
         $el.chart
             .style("width", "0")
             .style("height", "0")
             .style("pointer-events", "none");
-        document.body.appendChild($el.tooltip.node());
+        ((_a = $el.tooltip) === null || _a === void 0 ? void 0 : _a.node()) && document.body.appendChild($el.tooltip.node());
     };
     Sparkline.prototype.$afterInit = function () {
         var $$ = this.$$;
@@ -638,7 +568,8 @@ var Sparkline = /** @class */ (function (_super) {
     Sparkline.prototype.bindEvents = function (bind) {
         var _this = this;
         if (bind === void 0) { bind = true; }
-        if (this.$$.config.interaction_enabled) {
+        var config = this.$$.config;
+        if (config.interaction_enabled && config.tooltip_show) {
             var method_1 = "".concat(bind ? "add" : "remove", "EventListener");
             this.element
                 .forEach(function (el) {
@@ -655,7 +586,7 @@ var Sparkline = /** @class */ (function (_super) {
         eventReceiver.rect = e.target.getBoundingClientRect();
     };
     Sparkline.prototype.moveHandler = function (e) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         var $$ = this.$$;
         var index = $$.getDataIndexFromEvent(e);
         var data = (_a = $$.api.data(e.target.__id)) === null || _a === void 0 ? void 0 : _a[0];
@@ -664,13 +595,16 @@ var Sparkline = /** @class */ (function (_super) {
             d.name = d.id;
         }
         $$.state.event = e;
+        if (((_c = $$.isPointFocusOnly) === null || _c === void 0 ? void 0 : _c.call($$)) && d) {
+            (_d = $$.showCircleFocus) === null || _d === void 0 ? void 0 : _d.call($$, [d]);
+        }
         $$.setExpand(index, data.id, true);
         $$.showTooltip([d], e.target);
     };
     Sparkline.prototype.outHandler = function (e) {
         var $$ = this.$$;
         $$.state.event = e;
-        $$.unexpandCircles();
+        $$.isPointFocusOnly() ? $$.hideCircleFocus() : $$.unexpandCircles();
         $$.hideTooltip();
     };
     Sparkline.prototype.$redraw = function () {

@@ -5,14 +5,13 @@
  * billboard.js, JavaScript chart library
  * https://naver.github.io/billboard.js/
  * 
- * @version 3.3.3-nightly-20220303005130
+ * @version 3.18.0-nightly-20260314005324
  * @requires billboard.js
  * @summary billboard.js plugin
 */
 import { Delaunay } from 'd3-delaunay';
-import { polygonCentroid, polygonArea } from 'd3-polygon';
 
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -26,111 +25,113 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
-/* global Reflect, Promise */
-var _extendStatics = function extendStatics(d, b) {
-  _extendStatics = Object.setPrototypeOf || {
-    __proto__: []
-  } instanceof Array && function (d, b) {
-    d.__proto__ = b;
-  } || function (d, b) {
-    for (var p in b) {
-      if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
-    }
-  };
-
-  return _extendStatics(d, b);
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
 };
 
 function __extends(d, b) {
-  if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + (b + "") + " is not a constructor or null");
-
-  _extendStatics(d, b);
-
-  function __() {
-    this.constructor = d;
-  }
-
-  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
+
 function __spreadArray(to, from, pack) {
-  if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-    if (ar || !(i in from)) {
-      if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-      ar[i] = from[i];
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
     }
-  }
-  return to.concat(ar || Array.prototype.slice.call(from));
+    return to.concat(ar || Array.prototype.slice.call(from));
 }
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-var win = (function () {
-    var root = (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object && globalThis) ||
+/**
+ * Compute the signed area of a polygon using the Shoelace formula.
+ * @param {Array} polygon Array of [x, y] coordinates
+ * @returns {number} Signed area of the polygon
+ * @see https://en.wikipedia.org/wiki/Shoelace_formula
+ */
+function polygonArea(polygon) {
+    var n = polygon.length;
+    var area = 0;
+    var b = polygon[n - 1];
+    for (var i = 0; i < n; i++) {
+        var a = b;
+        b = polygon[i];
+        area += a[1] * b[0] - a[0] * b[1];
+    }
+    return area / 2;
+}
+/**
+ * Compute the centroid of a polygon.
+ * @param {Array} polygon Array of [x, y] coordinates
+ * @returns {Array} Centroid [x, y] of the polygon
+ */
+function polygonCentroid(polygon) {
+    var n = polygon.length;
+    var x = 0;
+    var y = 0;
+    var k = 0;
+    var b = polygon[n - 1];
+    for (var i = 0; i < n; i++) {
+        var a = b;
+        b = polygon[i];
+        var c = a[0] * b[1] - b[0] * a[1];
+        k += c;
+        x += (a[0] + b[0]) * c;
+        y += (a[1] + b[1]) * c;
+    }
+    k *= 3;
+    return [x / k, y / k];
+}
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
+/**
+ * Window object
+ * @private
+ */
+/* eslint-disable no-new-func, no-undef */
+/**
+ * Get global object
+ * @returns {object} window object
+ * @private
+ */
+function getGlobal() {
+    return (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object &&
+        globalThis) ||
         (typeof global === "object" && global !== null && global.Object === Object && global) ||
-        (typeof self === "object" && self !== null && self.Object === Object && self);
-    return root || Function("return this")();
-})();
-/* eslint-enable no-new-func, no-undef */
-// fallback for non-supported environments
-win.requestIdleCallback = win.requestIdleCallback || (function (cb) { return setTimeout(cb, 1); });
-win.cancelIdleCallback = win.cancelIdleCallback || (function (id) { return clearTimeout(id); });
+        (typeof self === "object" && self !== null && self.Object === Object && self) ||
+        Function("return this")();
+}
+var win = getGlobal();
 var doc = win === null || win === void 0 ? void 0 : win.document;
 
 var isDefined = function (v) { return typeof v !== "undefined"; };
 var isObjectType = function (v) { return typeof v === "object"; };
-/**
- * Check if is array
- * @param {Array} arr Data to be checked
- * @returns {boolean}
- * @private
- */
-var isArray = function (arr) { return Array.isArray(arr); };
-/**
- * Check if is object
- * @param {object} obj Data to be checked
- * @returns {boolean}
- * @private
- */
-var isObject = function (obj) { return obj && !(obj === null || obj === void 0 ? void 0 : obj.nodeType) && isObjectType(obj) && !isArray(obj); };
-/**
- * Merge object returning new object
- * @param {object} target Target object
- * @param {object} objectN Source object
- * @returns {object} merged target object
- * @private
- */
-function mergeObj(target) {
-    var objectN = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        objectN[_i - 1] = arguments[_i];
-    }
-    if (!objectN.length || (objectN.length === 1 && !objectN[0])) {
-        return target;
-    }
-    var source = objectN.shift();
-    if (isObject(target) && isObject(source)) {
-        Object.keys(source).forEach(function (key) {
-            var value = source[key];
-            if (isObject(value)) {
-                !target[key] && (target[key] = {});
-                target[key] = mergeObj(target[key], value);
-            }
-            else {
-                target[key] = isArray(value) ?
-                    value.concat() : value;
-            }
-        });
-    }
-    return mergeObj.apply(void 0, __spreadArray([target], objectN, false));
-}
 // emulate event
 ({
     mouse: (function () {
         var getParams = function () { return ({
-            bubbles: false, cancelable: false, screenX: 0, screenY: 0, clientX: 0, clientY: 0
+            bubbles: false,
+            cancelable: false,
+            screenX: 0,
+            screenY: 0,
+            clientX: 0,
+            clientY: 0
         }); };
         try {
             // eslint-disable-next-line no-new
@@ -140,7 +141,7 @@ function mergeObj(target) {
                 el.dispatchEvent(new MouseEvent(eventType, params));
             };
         }
-        catch (e) {
+        catch (_a) {
             // Polyfills DOM4 MouseEvent
             return function (el, eventType, params) {
                 if (params === void 0) { params = getParams(); }
@@ -151,31 +152,8 @@ function mergeObj(target) {
                 el.dispatchEvent(mouseEvent);
             };
         }
-    })(),
-    touch: function (el, eventType, params) {
-        var touchObj = new Touch(mergeObj({
-            identifier: Date.now(),
-            target: el,
-            radiusX: 2.5,
-            radiusY: 2.5,
-            rotationAngle: 10,
-            force: 0.5
-        }, params));
-        el.dispatchEvent(new TouchEvent(eventType, {
-            cancelable: true,
-            bubbles: true,
-            shiftKey: true,
-            touches: [touchObj],
-            targetTouches: [],
-            changedTouches: [touchObj]
-        }));
-    }
-});
+    })()});
 
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
 /**
  * Load configuration option
  * @param {object} config User's generation config value
@@ -205,18 +183,20 @@ function loadConfig(config) {
             thisConfig[key] = read;
         }
     });
+    // only should run in the ChartInternal context
+    if (this.api) {
+        this.state.orgConfig = config;
+    }
 }
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-
 /**
  * Base class to generate billboard.js plugin
  * @class Plugin
  */
-
 /**
  * Version info string for plugin
  * @name version
@@ -226,77 +206,57 @@ function loadConfig(config) {
  * @example
  *   bb.plugin.stanford.version;  // ex) 1.9.0
  */
-var Plugin = /*#__PURE__*/function () {
-  /**
-   * Version info string for plugin
-   * @name version
-   * @static
-   * @memberof Plugin
-   * @type {String}
-   * @example
-   *   bb.plugin.stanford.version;  // ex) 1.9.0
-   */
-
-  /**
-   * Constructor
-   * @param {Any} options config option object
-   * @private
-   */
-  function Plugin(options) {
-    if (options === void 0) {
-      options = {};
+var Plugin = /** @class */ (function () {
+    /**
+     * Constructor
+     * @param {Any} options config option object
+     * @private
+     */
+    function Plugin(options) {
+        if (options === void 0) { options = {}; }
+        this.options = options;
     }
-    this.options = options;
-  }
-  /**
-   * Lifecycle hook for 'beforeInit' phase.
-   * @private
-   */
-
-
-  var _proto = Plugin.prototype;
-
-  _proto.$beforeInit = function $beforeInit() {}
-  /**
-   * Lifecycle hook for 'init' phase.
-   * @private
-   */
-  ;
-
-  _proto.$init = function $init() {}
-  /**
-   * Lifecycle hook for 'afterInit' phase.
-   * @private
-   */
-  ;
-
-  _proto.$afterInit = function $afterInit() {}
-  /**
-   * Lifecycle hook for 'redraw' phase.
-   * @private
-   */
-  ;
-
-  _proto.$redraw = function $redraw() {}
-  /**
-   * Lifecycle hook for 'willDestroy' phase.
-   * @private
-   */
-  ;
-
-  _proto.$willDestroy = function $willDestroy() {
-    var _this = this;
-
-    Object.keys(this).forEach(function (key) {
-      _this[key] = null;
-      delete _this[key];
-    });
-  };
-
-  return Plugin;
-}();
-
-Plugin.version = "#3.3.3-nightly-20220303005130#";
+    /**
+     * Load plugin config from options
+     * @private
+     */
+    Plugin.prototype.loadConfig = function () {
+        loadConfig.call(this, this.options);
+    };
+    /**
+     * Lifecycle hook for 'beforeInit' phase.
+     * @private
+     */
+    Plugin.prototype.$beforeInit = function () { };
+    /**
+     * Lifecycle hook for 'init' phase.
+     * @private
+     */
+    Plugin.prototype.$init = function () { };
+    /**
+     * Lifecycle hook for 'afterInit' phase.
+     * @private
+     */
+    Plugin.prototype.$afterInit = function () { };
+    /**
+     * Lifecycle hook for 'redraw' phase.
+     * @private
+     */
+    Plugin.prototype.$redraw = function () { };
+    /**
+     * Lifecycle hook for 'willDestroy' phase.
+     * @private
+     */
+    Plugin.prototype.$willDestroy = function () {
+        var _this = this;
+        Object.keys(this).forEach(function (key) {
+            _this[key] = null;
+            delete _this[key];
+        });
+    };
+    Plugin.version = "3.18.0-nightly-20260314005324";
+    return Plugin;
+}());
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
@@ -349,7 +309,6 @@ var Options = /** @class */ (function () {
     }
     return Options;
 }());
-var Options$1 = Options;
 
 /**
  * TextOverlap plugin<br>
@@ -359,10 +318,8 @@ var Options$1 = Options;
  *   - Non required modules from billboard.js core, need to be installed separately.
  *   - Appropriate and works for axis based chart.
  * - **Required modules:**
- *   - [d3-polygon](https://github.com/d3/d3-polygon)
  *   - [d3-delaunay](https://github.com/d3/d3-delaunay)
  * @class plugin-textoverlap
- * @requires d3-polygon
  * @requires d3-delaunay
  * @param {object} options TextOverlap plugin options
  * @augments Plugin
@@ -385,7 +342,7 @@ var Options$1 = Options;
  *     ]
  *  });
  * @example
- *	import {bb} from "billboard.js";
+ * 	import {bb} from "billboard.js";
  * import TextOverlap from "billboard.js/dist/billboardjs-plugin-textoverlap";
  *
  * bb.generate({
@@ -398,11 +355,11 @@ var TextOverlap = /** @class */ (function (_super) {
     __extends(TextOverlap, _super);
     function TextOverlap(options) {
         var _this = _super.call(this, options) || this;
-        _this.config = new Options$1();
+        _this.config = new Options();
         return _this;
     }
     TextOverlap.prototype.$init = function () {
-        loadConfig.call(this, this.options);
+        this.loadConfig();
     };
     TextOverlap.prototype.$redraw = function () {
         var _a = this, $el = _a.$$.$el, selector = _a.config.selector;
@@ -439,16 +396,15 @@ var TextOverlap = /** @class */ (function (_super) {
             var cell = voronoi.cellPolygon(i);
             if (cell && this) {
                 var _a = points[i], x = _a[0], y = _a[1];
-                // @ts-ignore wrong type definiton for d3PolygonCentroid
                 var _b = polygonCentroid(cell), cx = _b[0], cy = _b[1];
-                // @ts-ignore wrong type definiton for d3PolygonArea
-                var polygonArea$1 = Math.abs(polygonArea(cell));
+                var cellArea = Math.abs(polygonArea(cell));
                 var angle = Math.round(Math.atan2(cy - y, cx - x) / Math.PI * 2);
                 var xTranslate = extent * (angle === 0 ? 1 : -1);
                 var yTranslate = angle === -1 ? -extent : extent + 5;
                 var txtAnchor = Math.abs(angle) === 1 ?
-                    "middle" : (angle === 0 ? "start" : "end");
-                this.style.display = polygonArea$1 < area ? "none" : "";
+                    "middle" :
+                    (angle === 0 ? "start" : "end");
+                this.style.display = cellArea < area ? "none" : "";
                 this.setAttribute("text-anchor", txtAnchor);
                 this.setAttribute("dy", "0.".concat(angle === 1 ? 71 : 35, "em"));
                 this.setAttribute("transform", "translate(".concat(xTranslate, ", ").concat(yTranslate, ")"));

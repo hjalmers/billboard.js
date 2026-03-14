@@ -5,11 +5,11 @@
  * billboard.js, JavaScript chart library
  * https://naver.github.io/billboard.js/
  * 
- * @version 3.3.3-nightly-20220303005130
+ * @version 3.18.0-nightly-20260314005324
  * @requires billboard.js
  * @summary billboard.js plugin
 */
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -23,69 +23,597 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
 
-/* global Reflect, Promise */
-var _extendStatics = function extendStatics(d, b) {
-  _extendStatics = Object.setPrototypeOf || {
-    __proto__: []
-  } instanceof Array && function (d, b) {
-    d.__proto__ = b;
-  } || function (d, b) {
-    for (var p in b) {
-      if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
-    }
-  };
-
-  return _extendStatics(d, b);
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
 };
 
 function __extends(d, b) {
-  if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + (b + "") + " is not a constructor or null");
-
-  _extendStatics(d, b);
-
-  function __() {
-    this.constructor = d;
-  }
-
-  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 }
 
-var _assign = function __assign() {
-  _assign = Object.assign || function (t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-      s = arguments[i];
-
-      for (var p in s) {
-        if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
-      }
-    }
-
-    return t;
-  };
-
-  return _assign.apply(this, arguments);
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
 };
-function __spreadArray(to, from, pack) {
-  if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-    if (ar || !(i in from)) {
-      if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-      ar[i] = from[i];
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
+/**
+ * Window object
+ * @private
+ */
+/* eslint-disable no-new-func, no-undef */
+/**
+ * Get global object
+ * @returns {object} window object
+ * @private
+ */
+function getGlobal() {
+    return (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object &&
+        globalThis) ||
+        (typeof global === "object" && global !== null && global.Object === Object && global) ||
+        (typeof self === "object" && self !== null && self.Object === Object && self) ||
+        Function("return this")();
+}
+var win = getGlobal();
+var doc = win === null || win === void 0 ? void 0 : win.document;
+
+/**
+ * Copyright (c) 2017 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ * @ignore
+ */
+/**
+ * HTML/SVG Sanitization module
+ * Pure whitelist approach - only explicitly allowed tags, attributes, and protocols pass through
+ */
+// Whitelist of allowed HTML/SVG tags
+var ALLOWED_TAGS = new Set([
+    // HTML tags for tooltip/legend templates
+    "span",
+    "div",
+    "p",
+    "br",
+    "b",
+    "i",
+    "em",
+    "small",
+    "strong",
+    "mark",
+    "u",
+    "s",
+    "sub",
+    "sup",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "caption",
+    "colgroup",
+    "col",
+    "hr",
+    "pre",
+    "code",
+    "blockquote",
+    "abbr",
+    "ins",
+    "del",
+    "a",
+    "img",
+    "figure",
+    "figcaption",
+    // SVG tags for point patterns
+    "svg",
+    "g",
+    "path",
+    "circle",
+    "ellipse",
+    "rect",
+    "line",
+    "polyline",
+    "polygon",
+    "text",
+    "tspan",
+    "textPath",
+    "use",
+    "defs",
+    "symbol",
+    "clipPath",
+    "mask",
+    "linearGradient",
+    "radialGradient",
+    "stop",
+    "pattern",
+    "marker",
+    "title",
+    "desc"
+]);
+// Whitelist of allowed attributes
+var ALLOWED_ATTRS = new Set([
+    // Common attributes
+    "class",
+    "id",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    // HTML specific
+    "href",
+    "src",
+    "alt",
+    "width",
+    "height",
+    "colspan",
+    "rowspan",
+    "scope",
+    "headers",
+    // SVG presentation attributes
+    "d",
+    "points",
+    "x",
+    "y",
+    "x1",
+    "x2",
+    "y1",
+    "y2",
+    "cx",
+    "cy",
+    "r",
+    "rx",
+    "ry",
+    "dx",
+    "dy",
+    "viewBox",
+    "preserveAspectRatio",
+    "transform",
+    "fill",
+    "fill-opacity",
+    "fill-rule",
+    "stroke",
+    "stroke-width",
+    "stroke-opacity",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "stroke-dasharray",
+    "stroke-dashoffset",
+    "opacity",
+    "clip-path",
+    "clip-rule",
+    "mask",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "font-style",
+    "text-anchor",
+    "dominant-baseline",
+    "offset",
+    "stop-color",
+    "stop-opacity",
+    "gradientUnits",
+    "gradientTransform",
+    "spreadMethod",
+    "patternUnits",
+    "patternTransform",
+    "marker-start",
+    "marker-mid",
+    "marker-end",
+    "markerWidth",
+    "markerHeight",
+    "refX",
+    "refY",
+    "xlink:href"
+]);
+// Case-insensitive lookup maps: lowercase key → canonical casing from whitelists
+var TAG_CASE_MAP = new Map();
+ALLOWED_TAGS.forEach(function (tag) { return TAG_CASE_MAP.set(tag.toLowerCase(), tag); });
+var ATTR_CASE_MAP = new Map();
+ALLOWED_ATTRS.forEach(function (attr) { return ATTR_CASE_MAP.set(attr.toLowerCase(), attr); });
+// Whitelist of allowed URI protocols
+var ALLOWED_URI_PROTOCOLS = new Set([
+    "http:",
+    "https:",
+    "mailto:"
+]);
+// Attributes that contain URIs
+var URI_ATTRS = new Set(["href", "src", "xlink:href"]);
+// Pre-compiled regex patterns for performance
+var TAG_NAME_REGEX = /^<\/?([a-zA-Z][a-zA-Z0-9]*)/;
+var CLOSING_TAG_REGEX = /^<\/([a-zA-Z][a-zA-Z0-9]*)\s*>$/;
+var OPENING_TAG_REGEX = /^<([a-zA-Z][a-zA-Z0-9]*)([\s\S]*?)(\/?)>$/;
+var ATTR_REGEX = /([a-zA-Z][\w:-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+var URL_IN_STYLE_REGEX = /url\s*\(\s*["']?([^"')]+)["']?\s*\)/gi;
+// Dangerous CSS patterns
+var DANGEROUS_CSS_PATTERNS = [
+    "expression(",
+    "behavior:",
+    "binding:",
+    "@import",
+    "@charset",
+    "-moz-binding:"
+];
+/**
+ * Decode HTML entities in a string
+ * @param {string} str String with potential HTML entities
+ * @returns {string} Decoded string
+ * @private
+ */
+function decodeHTMLEntities(str) {
+    return str
+        // Named entities
+        .replace(/&colon;/gi, ":")
+        .replace(/&newline;/gi, "\n")
+        .replace(/&tab;/gi, "\t")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, "\"")
+        .replace(/&apos;/gi, "'")
+        // Numeric entities (decimal)
+        .replace(/&#(\d+);/gi, function (_, code) { return String.fromCharCode(parseInt(code, 10)); })
+        // Numeric entities (hex)
+        .replace(/&#x([0-9a-f]+);/gi, function (_, code) { return String.fromCharCode(parseInt(code, 16)); });
+}
+/**
+ * Check if a URI is safe (whitelist approach)
+ * @param {string} uri URI to check
+ * @returns {boolean} Whether the URI is safe
+ * @private
+ */
+function isSafeURI(uri) {
+    // Decode HTML entities first to prevent bypass
+    var decoded = decodeHTMLEntities(uri).trim();
+    // Remove any whitespace/control characters that could be used for bypass
+    // eslint-disable-next-line no-control-regex
+    var normalized = decoded.replace(/[\s\u0000-\u001f]/g, "").toLowerCase();
+    // Empty or fragment-only URIs are safe
+    if (!normalized || normalized.startsWith("#")) {
+        return true;
     }
-  }
-  return to.concat(ar || Array.prototype.slice.call(from));
+    // Relative paths are safe
+    if (normalized.startsWith("/") ||
+        normalized.startsWith("./") ||
+        normalized.startsWith("../") ||
+        !normalized.includes(":")) {
+        return true;
+    }
+    // Check if protocol is in whitelist
+    var colonIndex = normalized.indexOf(":");
+    if (colonIndex > 0) {
+        var protocol = normalized.substring(0, colonIndex + 1);
+        return ALLOWED_URI_PROTOCOLS.has(protocol);
+    }
+    return false;
+}
+/**
+ * Check if a style value is safe (whitelist approach)
+ * @param {string} style Style attribute value
+ * @returns {string|null} Sanitized style or null if unsafe
+ * @private
+ */
+function sanitizeStyleValue(style) {
+    // Decode HTML entities first
+    var decoded = decodeHTMLEntities(style);
+    // Remove any control characters
+    // eslint-disable-next-line no-control-regex
+    var cleaned = decoded.replace(/[\u0000-\u001f]/g, "");
+    // Check for url() - only allow safe URIs inside
+    URL_IN_STYLE_REGEX.lastIndex = 0;
+    var match;
+    while ((match = URL_IN_STYLE_REGEX.exec(cleaned)) !== null) {
+        if (!isSafeURI(match[1])) {
+            return null;
+        }
+    }
+    // Check for dangerous CSS patterns (expression, behavior, etc.)
+    var normalizedLower = cleaned.toLowerCase().replace(/\s/g, "");
+    for (var _i = 0, DANGEROUS_CSS_PATTERNS_1 = DANGEROUS_CSS_PATTERNS; _i < DANGEROUS_CSS_PATTERNS_1.length; _i++) {
+        var pattern = DANGEROUS_CSS_PATTERNS_1[_i];
+        if (normalizedLower.includes(pattern)) {
+            return null;
+        }
+    }
+    return style;
+}
+// Lookup table for encoding dangerous characters in attribute values
+var ATTR_ENCODE_MAP = {
+    "\"": "&quot;",
+    "'": "&#39;",
+    "`": "&#96;"
+};
+var ATTR_ENCODE_REGEX = /["'`]/g;
+/**
+ * Encode dangerous characters in attribute values to HTML entities
+ * This prevents attribute injection attacks where quotes/backticks break out of the attribute context
+ * @param {string} value Attribute value
+ * @returns {string} Encoded value
+ * @private
+ */
+function encodeAttrValue(value) {
+    return value.replace(ATTR_ENCODE_REGEX, function (char) { return ATTR_ENCODE_MAP[char]; });
+}
+/**
+ * Sanitize attribute value using whitelist approach
+ * @param {string} name Attribute name
+ * @param {string} value Attribute value
+ * @param {boolean} wasUnquoted Whether the value was originally unquoted
+ * @returns {string|null} Sanitized value if safe, null if should be removed
+ * @private
+ */
+function sanitizeAttrValue(name, value, wasUnquoted) {
+    if (wasUnquoted === void 0) { wasUnquoted = false; }
+    // Check URI attributes with whitelist
+    if (URI_ATTRS.has(name)) {
+        if (!isSafeURI(value)) {
+            return null;
+        }
+        // Encode dangerous characters in URI values to prevent attribute injection
+        return wasUnquoted ? encodeAttrValue(value) : value;
+    }
+    // Check style attribute
+    if (name === "style") {
+        var sanitizedStyle = sanitizeStyleValue(value);
+        if (sanitizedStyle === null) {
+            return null;
+        }
+        // Encode dangerous characters in style values
+        return wasUnquoted ? encodeAttrValue(sanitizedStyle) : sanitizedStyle;
+    }
+    // For other attributes, check for embedded event handlers
+    var decoded = decodeHTMLEntities(value).toLowerCase().replace(/\s/g, "");
+    if (/\bon\w+=/.test(decoded)) {
+        return null;
+    }
+    // Encode dangerous characters to prevent attribute injection
+    return wasUnquoted ? encodeAttrValue(value) : value;
+}
+/**
+ * Extract tag name from a tag string
+ * Returns null if not a valid tag format
+ * @param {string} tag Tag string starting with <
+ * @returns {string|null} Lowercase tag name or null
+ * @private
+ */
+function extractTagName(tag) {
+    // Must start with < followed immediately by letter (no spaces allowed)
+    var match = tag.match(TAG_NAME_REGEX);
+    return match ? match[1].toLowerCase() : null;
+}
+/**
+ * Check if a tag is in the whitelist
+ * @param {string} tag Tag string
+ * @returns {boolean} Whether tag is allowed
+ * @private
+ */
+function isAllowedTag(tag) {
+    var tagName = extractTagName(tag);
+    return tagName !== null && TAG_CASE_MAP.has(tagName);
+}
+/**
+ * Sanitize a single HTML/SVG tag (only called for allowed tags)
+ * @param {string} fullTag The full tag string including < and >
+ * @returns {string} Sanitized tag
+ * @private
+ */
+function sanitizeTag(fullTag) {
+    var _a, _b, _c;
+    // Closing tag
+    var closingMatch = fullTag.match(CLOSING_TAG_REGEX);
+    if (closingMatch) {
+        var lowerName = closingMatch[1].toLowerCase();
+        return "</".concat((_a = TAG_CASE_MAP.get(lowerName)) !== null && _a !== void 0 ? _a : lowerName, ">");
+    }
+    // Opening tag
+    var openingMatch = fullTag.match(OPENING_TAG_REGEX);
+    if (!openingMatch) {
+        return "";
+    }
+    var tagName = openingMatch[1], attrString = openingMatch[2], selfClose = openingMatch[3];
+    var lowerTagName = tagName.toLowerCase();
+    var canonicalTagName = (_b = TAG_CASE_MAP.get(lowerTagName)) !== null && _b !== void 0 ? _b : lowerTagName;
+    // Parse and filter attributes, preserving original quote style
+    var allowedAttrs = [];
+    ATTR_REGEX.lastIndex = 0;
+    var attrMatch;
+    while ((attrMatch = ATTR_REGEX.exec(attrString)) !== null) {
+        var lowerAttrName = attrMatch[1].toLowerCase();
+        var doubleQuotedValue = attrMatch[2];
+        var singleQuotedValue = attrMatch[3];
+        var unquotedValue = attrMatch[4];
+        // Skip event handlers (on*)
+        if (lowerAttrName.startsWith("on")) {
+            continue;
+        }
+        var canonicalAttrName = (_c = ATTR_CASE_MAP.get(lowerAttrName)) !== null && _c !== void 0 ? _c : lowerAttrName;
+        // Determine original quote style and value
+        var attrValue = void 0;
+        var quoteChar = void 0;
+        if (doubleQuotedValue !== undefined) {
+            attrValue = doubleQuotedValue;
+            quoteChar = "\"";
+        }
+        else if (singleQuotedValue !== undefined) {
+            attrValue = singleQuotedValue;
+            quoteChar = "'";
+        }
+        else if (unquotedValue !== undefined) {
+            attrValue = unquotedValue;
+            quoteChar = "\"";
+        }
+        else {
+            // Boolean attribute (no value)
+            if (ATTR_CASE_MAP.has(lowerAttrName)) {
+                allowedAttrs.push(canonicalAttrName);
+            }
+            continue;
+        }
+        if (ATTR_CASE_MAP.has(lowerAttrName)) {
+            var wasUnquoted = unquotedValue !== undefined;
+            var sanitizedValue = sanitizeAttrValue(lowerAttrName, attrValue, wasUnquoted);
+            if (sanitizedValue !== null) {
+                allowedAttrs.push("".concat(canonicalAttrName, "=").concat(quoteChar).concat(sanitizedValue).concat(quoteChar));
+            }
+        }
+    }
+    var attrsStr = allowedAttrs.length > 0 ? " ".concat(allowedAttrs.join(" ")) : "";
+    var selfCloseStr = selfClose ? "/>" : ">";
+    return "<".concat(canonicalTagName).concat(attrsStr).concat(selfCloseStr);
+}
+/**
+ * Sanitize HTML string to prevent XSS attacks
+ * Pure whitelist approach - allowed tags are sanitized, others are escaped
+ * @param {string} str Target string value
+ * @returns {string} Sanitized string with only allowed elements
+ * @private
+ */
+function sanitize(str) {
+    if (typeof str !== "string" || !str || str.indexOf("<") === -1) {
+        return str;
+    }
+    // Single pass: sanitize allowed tags, escape disallowed ones
+    // Also match orphaned fragments like "ipt>" from broken tags
+    return str.replace(/<\/?[^>]*>|[^<>\s]+>/g, function (match) {
+        // Remove HTML comments
+        if (match.startsWith("<!--")) {
+            return "";
+        }
+        // Orphaned fragment (e.g., "ipt>") → escape '>'
+        if (!match.startsWith("<")) {
+            return match.slice(0, -1) + "&gt;";
+        }
+        // Allowed tag → sanitize attributes
+        if (isAllowedTag(match)) {
+            return sanitizeTag(match);
+        }
+        // Disallowed tag → escape all '<' to prevent execution
+        return match.replace(/</g, "&lt;");
+    });
+}
+
+var isNumber = function (v) { return typeof v === "number"; };
+var isDefined = function (v) { return typeof v !== "undefined"; };
+var isObjectType = function (v) { return typeof v === "object"; };
+// emulate event
+({
+    mouse: (function () {
+        var getParams = function () { return ({
+            bubbles: false,
+            cancelable: false,
+            screenX: 0,
+            screenY: 0,
+            clientX: 0,
+            clientY: 0
+        }); };
+        try {
+            // eslint-disable-next-line no-new
+            new MouseEvent("t");
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                el.dispatchEvent(new MouseEvent(eventType, params));
+            };
+        }
+        catch (_a) {
+            // Polyfills DOM4 MouseEvent
+            return function (el, eventType, params) {
+                if (params === void 0) { params = getParams(); }
+                var mouseEvent = doc.createEvent("MouseEvent");
+                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/initMouseEvent
+                mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, win, 0, // the event's mouse click count
+                params.screenX, params.screenY, params.clientX, params.clientY, false, false, false, false, 0, null);
+                el.dispatchEvent(mouseEvent);
+            };
+        }
+    })()});
+/**
+ * Process the template  & return bound string
+ * @param {string} tpl Template string
+ * @param {object} data Data value to be replaced
+ * @returns {string}
+ * @private
+ */
+function tplProcess(tpl, data) {
+    var res = tpl;
+    for (var x in data) {
+        res = res.replace(new RegExp("{=".concat(x, "}"), "g"), data[x]);
+    }
+    return sanitize(res);
+}
+
+/**
+ * Load configuration option
+ * @param {object} config User's generation config value
+ * @private
+ */
+function loadConfig(config) {
+    var thisConfig = this.config;
+    var target;
+    var keys;
+    var read;
+    var find = function () {
+        var key = keys.shift();
+        if (key && target && isObjectType(target) && key in target) {
+            target = target[key];
+            return find();
+        }
+        else if (!key) {
+            return target;
+        }
+        return undefined;
+    };
+    Object.keys(thisConfig).forEach(function (key) {
+        target = config;
+        keys = key.split("_");
+        read = find();
+        if (isDefined(read)) {
+            thisConfig[key] = read;
+        }
+    });
+    // only should run in the ChartInternal context
+    if (this.api) {
+        this.state.orgConfig = config;
+    }
 }
 
 /**
  * Copyright (c) 2017 ~ present NAVER Corp.
  * billboard.js project is licensed under the MIT license
  */
-
 /**
  * Base class to generate billboard.js plugin
  * @class Plugin
  */
-
 /**
  * Version info string for plugin
  * @name version
@@ -95,77 +623,78 @@ function __spreadArray(to, from, pack) {
  * @example
  *   bb.plugin.stanford.version;  // ex) 1.9.0
  */
-var Plugin = /*#__PURE__*/function () {
-  /**
-   * Version info string for plugin
-   * @name version
-   * @static
-   * @memberof Plugin
-   * @type {String}
-   * @example
-   *   bb.plugin.stanford.version;  // ex) 1.9.0
-   */
-
-  /**
-   * Constructor
-   * @param {Any} options config option object
-   * @private
-   */
-  function Plugin(options) {
-    if (options === void 0) {
-      options = {};
+var Plugin = /** @class */ (function () {
+    /**
+     * Constructor
+     * @param {Any} options config option object
+     * @private
+     */
+    function Plugin(options) {
+        if (options === void 0) { options = {}; }
+        this.options = options;
     }
-    this.options = options;
-  }
-  /**
-   * Lifecycle hook for 'beforeInit' phase.
-   * @private
-   */
+    /**
+     * Load plugin config from options
+     * @private
+     */
+    Plugin.prototype.loadConfig = function () {
+        loadConfig.call(this, this.options);
+    };
+    /**
+     * Lifecycle hook for 'beforeInit' phase.
+     * @private
+     */
+    Plugin.prototype.$beforeInit = function () { };
+    /**
+     * Lifecycle hook for 'init' phase.
+     * @private
+     */
+    Plugin.prototype.$init = function () { };
+    /**
+     * Lifecycle hook for 'afterInit' phase.
+     * @private
+     */
+    Plugin.prototype.$afterInit = function () { };
+    /**
+     * Lifecycle hook for 'redraw' phase.
+     * @private
+     */
+    Plugin.prototype.$redraw = function () { };
+    /**
+     * Lifecycle hook for 'willDestroy' phase.
+     * @private
+     */
+    Plugin.prototype.$willDestroy = function () {
+        var _this = this;
+        Object.keys(this).forEach(function (key) {
+            _this[key] = null;
+            delete _this[key];
+        });
+    };
+    Plugin.version = "3.18.0-nightly-20260314005324";
+    return Plugin;
+}());
 
-
-  var _proto = Plugin.prototype;
-
-  _proto.$beforeInit = function $beforeInit() {}
-  /**
-   * Lifecycle hook for 'init' phase.
-   * @private
-   */
-  ;
-
-  _proto.$init = function $init() {}
-  /**
-   * Lifecycle hook for 'afterInit' phase.
-   * @private
-   */
-  ;
-
-  _proto.$afterInit = function $afterInit() {}
-  /**
-   * Lifecycle hook for 'redraw' phase.
-   * @private
-   */
-  ;
-
-  _proto.$redraw = function $redraw() {}
-  /**
-   * Lifecycle hook for 'willDestroy' phase.
-   * @private
-   */
-  ;
-
-  _proto.$willDestroy = function $willDestroy() {
-    var _this = this;
-
-    Object.keys(this).forEach(function (key) {
-      _this[key] = null;
-      delete _this[key];
-    });
-  };
-
-  return Plugin;
-}();
-
-Plugin.version = "#3.3.3-nightly-20220303005130#";
+/**
+ * Copyright (c) 2021 ~ present NAVER Corp.
+ * billboard.js project is licensed under the MIT license
+ */
+/**
+ * Constants values for plugin option
+ * @ignore
+ */
+var defaultStyle = {
+    id: "__tableview-style__",
+    class: "bb-tableview",
+    rule: ".bb-tableview {\n\t\tborder-collapse:collapse;\n\t\tborder-spacing:0;\n\t\tbackground:#fff;\n\t\tmin-width:100%;\n\t\tmargin-top:10px;\n\t\tfont-family:sans-serif;\n\t\tfont-size:.9em;\n\t}\n\t.bb-tableview tr:hover {\n\t\tbackground:#eef7ff;\n\t}\n\t.bb-tableview thead tr {\n\t\tbackground:#f8f8f8;\n\t}\n\t.bb-tableview caption,.bb-tableview td,.bb-tableview th {\n\t\ttext-align: center;\n\t\tborder:1px solid silver;\n\t\tpadding:.5em;\n\t}\n\t.bb-tableview caption {\n\t\tfont-size:1.1em;\n\t\tfont-weight:700;\n\t\tmargin-bottom: -1px;\n\t}"
+};
+// template
+var tpl = {
+    body: "<caption>{=title}</caption>\n\t\t<thead><tr>{=thead}</tr></thead>\n\t\t<tbody>{=tbody}</tbody>",
+    thead: "<th scope=\"col\">{=title}</th>",
+    tbodyHeader: "<th scope=\"row\">{=value}</th>",
+    tbody: "<td>{=value}</td>"
+};
 
 /**
  * Copyright (c) 2021 ~ present NAVER Corp.
@@ -207,7 +736,7 @@ var Options = /** @class */ (function () {
              * Set category text format function.
              * @name categoryFormat
              * @memberof plugin-tableview
-             * @type {Function}
+             * @type {function}
              * @returns {string}
              * @default function(v) { // will return formatted value according x Axis type }}
              * @example
@@ -232,7 +761,7 @@ var Options = /** @class */ (function () {
              * @example
              *   class: "table-class-name"
              */
-            "class": undefined,
+            class: undefined,
             /**
              * Set to apply default style(`.bb-tableview`) to tableview element.
              * @name style
@@ -263,188 +792,21 @@ var Options = /** @class */ (function () {
              * @example
              *   legendToggleUpdate: false
              */
-            updateOnToggle: true
+            updateOnToggle: true,
+            /**
+             * Set how null value to be shown.
+             * @name nullString
+             * @memberof plugin-tableview
+             * @type {string}
+             * @default "-"
+             * @example
+             *   nullString: "N/A"
+             */
+            nullString: "-"
         };
     }
     return Options;
 }());
-var Options$1 = Options;
-
-/**
- * Copyright (c) 2021 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-var defaultStyle = {
-    id: "__tableview-style__",
-    "class": "bb-tableview",
-    rule: ".bb-tableview {\n\t\tborder-collapse:collapse;\n\t\tborder-spacing:0;\n\t\tbackground:#fff;\n\t\tmin-width:100%;\n\t\tmargin-top:10px;\n\t\tfont-family:sans-serif;\n\t\tfont-size:.9em;\n\t}\n\t.bb-tableview tr:hover {\n\t\tbackground:#eef7ff;\n\t}\n\t.bb-tableview thead tr {\n\t\tbackground:#f8f8f8;\n\t}\n\t.bb-tableview caption,.bb-tableview td,.bb-tableview th {\n\t\ttext-align: center;\n\t\tborder:1px solid silver;\n\t\tpadding:.5em;\n\t}\n\t.bb-tableview caption {\n\t\tfont-size:1.1em;\n\t\tfont-weight:700;\n\t\tmargin-bottom: -1px;\n\t}"
-};
-// template
-var tpl = {
-    body: "<caption>{=title}</caption>\n\t\t<thead><tr>{=thead}</tr></thead>\n\t\t<tbody>{=tbody}</tbody>",
-    thead: "<th scope=\"col\">{=title}</th>",
-    tbodyHeader: "<th scope=\"row\">{=value}</th>",
-    tbody: "<td>{=value}</td>"
-};
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-var win = (function () {
-    var root = (typeof globalThis === "object" && globalThis !== null && globalThis.Object === Object && globalThis) ||
-        (typeof global === "object" && global !== null && global.Object === Object && global) ||
-        (typeof self === "object" && self !== null && self.Object === Object && self);
-    return root || Function("return this")();
-})();
-/* eslint-enable no-new-func, no-undef */
-// fallback for non-supported environments
-win.requestIdleCallback = win.requestIdleCallback || (function (cb) { return setTimeout(cb, 1); });
-win.cancelIdleCallback = win.cancelIdleCallback || (function (id) { return clearTimeout(id); });
-var doc = win === null || win === void 0 ? void 0 : win.document;
-
-var isNumber = function (v) { return typeof v === "number"; };
-var isDefined = function (v) { return typeof v !== "undefined"; };
-var isObjectType = function (v) { return typeof v === "object"; };
-/**
- * Check if is array
- * @param {Array} arr Data to be checked
- * @returns {boolean}
- * @private
- */
-var isArray = function (arr) { return Array.isArray(arr); };
-/**
- * Check if is object
- * @param {object} obj Data to be checked
- * @returns {boolean}
- * @private
- */
-var isObject = function (obj) { return obj && !(obj === null || obj === void 0 ? void 0 : obj.nodeType) && isObjectType(obj) && !isArray(obj); };
-/**
- * Merge object returning new object
- * @param {object} target Target object
- * @param {object} objectN Source object
- * @returns {object} merged target object
- * @private
- */
-function mergeObj(target) {
-    var objectN = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        objectN[_i - 1] = arguments[_i];
-    }
-    if (!objectN.length || (objectN.length === 1 && !objectN[0])) {
-        return target;
-    }
-    var source = objectN.shift();
-    if (isObject(target) && isObject(source)) {
-        Object.keys(source).forEach(function (key) {
-            var value = source[key];
-            if (isObject(value)) {
-                !target[key] && (target[key] = {});
-                target[key] = mergeObj(target[key], value);
-            }
-            else {
-                target[key] = isArray(value) ?
-                    value.concat() : value;
-            }
-        });
-    }
-    return mergeObj.apply(void 0, __spreadArray([target], objectN, false));
-}
-// emulate event
-({
-    mouse: (function () {
-        var getParams = function () { return ({
-            bubbles: false, cancelable: false, screenX: 0, screenY: 0, clientX: 0, clientY: 0
-        }); };
-        try {
-            // eslint-disable-next-line no-new
-            new MouseEvent("t");
-            return function (el, eventType, params) {
-                if (params === void 0) { params = getParams(); }
-                el.dispatchEvent(new MouseEvent(eventType, params));
-            };
-        }
-        catch (e) {
-            // Polyfills DOM4 MouseEvent
-            return function (el, eventType, params) {
-                if (params === void 0) { params = getParams(); }
-                var mouseEvent = doc.createEvent("MouseEvent");
-                // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/initMouseEvent
-                mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, win, 0, // the event's mouse click count
-                params.screenX, params.screenY, params.clientX, params.clientY, false, false, false, false, 0, null);
-                el.dispatchEvent(mouseEvent);
-            };
-        }
-    })(),
-    touch: function (el, eventType, params) {
-        var touchObj = new Touch(mergeObj({
-            identifier: Date.now(),
-            target: el,
-            radiusX: 2.5,
-            radiusY: 2.5,
-            rotationAngle: 10,
-            force: 0.5
-        }, params));
-        el.dispatchEvent(new TouchEvent(eventType, {
-            cancelable: true,
-            bubbles: true,
-            shiftKey: true,
-            touches: [touchObj],
-            targetTouches: [],
-            changedTouches: [touchObj]
-        }));
-    }
-});
-/**
- * Process the template  & return bound string
- * @param {string} tpl Template string
- * @param {object} data Data value to be replaced
- * @returns {string}
- * @private
- */
-function tplProcess(tpl, data) {
-    var res = tpl;
-    for (var x in data) {
-        res = res.replace(new RegExp("{=".concat(x, "}"), "g"), data[x]);
-    }
-    return res;
-}
-
-/**
- * Copyright (c) 2017 ~ present NAVER Corp.
- * billboard.js project is licensed under the MIT license
- */
-/**
- * Load configuration option
- * @param {object} config User's generation config value
- * @private
- */
-function loadConfig(config) {
-    var thisConfig = this.config;
-    var target;
-    var keys;
-    var read;
-    var find = function () {
-        var key = keys.shift();
-        if (key && target && isObjectType(target) && key in target) {
-            target = target[key];
-            return find();
-        }
-        else if (!key) {
-            return target;
-        }
-        return undefined;
-    };
-    Object.keys(thisConfig).forEach(function (key) {
-        target = config;
-        keys = key.split("_");
-        read = find();
-        if (isDefined(read)) {
-            thisConfig[key] = read;
-        }
-    });
-}
 
 /**
  * Table view plugin.<br>
@@ -474,7 +836,8 @@ function loadConfig(config) {
  *          class: "my-class-name",
  *          style: true,
  *          title: "My Data List",
- *          updateOnToggle: false
+ *          updateOnToggle: false,
+ *          nullString: "N/A"
  *        }),
  *     ]
  *  });
@@ -493,16 +856,16 @@ var TableView = /** @class */ (function (_super) {
     __extends(TableView, _super);
     function TableView(options) {
         var _this = _super.call(this, options) || this;
-        _this.config = new Options$1();
+        _this.config = new Options();
         return _this;
     }
     TableView.prototype.$beforeInit = function () {
-        loadConfig.call(this, this.options);
+        this.loadConfig();
     };
     TableView.prototype.$init = function () {
         var _a;
-        var _b = this.config, className = _b["class"], selector = _b.selector, style = _b.style;
-        var element = document.querySelector(selector || ".".concat(className || defaultStyle["class"]));
+        var _b = this.config, className = _b.class, selector = _b.selector, style = _b.style;
+        var element = document.querySelector(selector || ".".concat(className || defaultStyle.class));
         if (!element) {
             var chart = this.$$.$el.chart.node();
             element = document.createElement("table");
@@ -521,7 +884,7 @@ var TableView = /** @class */ (function (_super) {
             (document.head || document.getElementsByTagName("head")[0])
                 .appendChild(s);
         }
-        (_a = element.classList).add.apply(_a, [style && defaultStyle["class"], className].filter(Boolean));
+        (_a = element.classList).add.apply(_a, [style && defaultStyle.class, className].filter(Boolean));
         this.element = element;
     };
     /**
@@ -548,15 +911,15 @@ var TableView = /** @class */ (function (_super) {
             });
         });
         rows.forEach(function (v) {
-            tbody += "<tr>".concat(v.map(function (d, i) { return tplProcess(i ? tpl.tbody : tpl.tbodyHeader, {
-                value: i === 0 ?
-                    config.categoryFormat.bind(_this)(d) :
-                    (isNumber(d) ? d.toLocaleString() : "")
-            }); }).join(""), "</tr>");
+            tbody += "<tr>".concat(v.map(function (d, i) {
+                return tplProcess(i ? tpl.tbody : tpl.tbodyHeader, {
+                    value: i === 0 ?
+                        config.categoryFormat.bind(_this)(d) :
+                        (isNumber(d) ? d.toLocaleString() : config.nullString)
+                });
+            }).join(""), "</tr>");
         });
-        var rx = /<[^>]+><\/[^>]+>/g;
-        var r = tplProcess(tpl.body, _assign(_assign({}, config), { title: config.title || $$.config.title_text || "", thead: thead, tbody: tbody })).replace(rx, "");
-        element.innerHTML = r;
+        element.innerHTML = tplProcess(tpl.body, __assign(__assign({}, config), { title: config.title || $$.config.title_text || "", thead: thead, tbody: tbody }));
     };
     TableView.prototype.$redraw = function () {
         var state = this.$$.state;
@@ -564,12 +927,12 @@ var TableView = /** @class */ (function (_super) {
         !doNotUpdate && this.generateTable();
     };
     TableView.prototype.$willDestroy = function () {
-        var _a;
-        this.element.parentNode.removeChild(this.element);
+        var _a, _b;
+        (_a = this.element.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(this.element);
         // remove default css style when left one chart instance
         if (this.$$.charts.length === 1) {
             var s = document.getElementById(defaultStyle.id);
-            (_a = s === null || s === void 0 ? void 0 : s.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(s);
+            (_b = s === null || s === void 0 ? void 0 : s.parentNode) === null || _b === void 0 ? void 0 : _b.removeChild(s);
         }
     };
     return TableView;
